@@ -1,4 +1,4 @@
-# Paladin starting-board raw bonuses
+# Paladin Paragon raw bonuses
 
 ## Scope and provenance
 
@@ -73,3 +73,9 @@ Existing verified `ParagonNodeCoreStat_Normal = 5` and `ParagonNodeCoreStat_Magi
 - Tenacity's observed 630 Strength requirement selects `StrengthMain1` from a definition containing additional threshold selectors. The calculator intentionally does not activate the other selectors.
 - Brawn's observed base Damage +10% has no distinct corresponding attribute entry in the extracted node definition; its source mechanics remain unexplained.
 - The underlying power-budget function definitions, literal/GBID precedence, and all unobserved formula contexts remain unknown.
+
+## Castle board extension
+
+Castle (`Paragon_Paladin_01`, board SNO `2436511`) now has a separate board-scoped registry. It does not reuse Board 00 node records merely because a display category looks similar. Exact shared SNO observations and same-revision formula coefficients calibrated against multiple Board 00 observations resolve Castle's Magic bonuses and most Rare base magnitudes.
+
+The detailed per-node formulas, values, confidence levels, Paladin selector evidence, and remaining unknowns are recorded in [`castle-numerical-bonuses.md`](./castle-numerical-bonuses.md). Castle conditional amounts are kept separate from base totals, but are not activated because `ParagonBoardEquipIndex` and the composite Paladin threshold semantics are not modeled. Grappler's Rare Minor Damage-to-CC value and Stalwart's Rare Minor Block Chance remain numerically unresolved.

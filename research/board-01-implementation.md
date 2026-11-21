@@ -44,21 +44,24 @@ Board 01 has no authored starting node. In the game, its entry depends on board 
 
 ## Numerical accuracy and unresolved bonuses
 
-The existing bonus registry remains unchanged and remains gated to Board 00 SNO `2436481`. Board 01 cannot consume its board-scoped direct observations.
+Phase 10B adds a separate Castle registry gated to board SNO `2436511` and the same pinned revision. Board 00's existing records and values remain unchanged. Castle can reuse an identical observed SNO or a result derived from a pinned formula and a same-revision shared multiplier calibrated by multiple Board 00 observations; it does not consume Board 00 records indiscriminately.
 
-Board 01 totals only the revision-pinned constants already supported by the calculator:
+Board 01 totals the revision-pinned core constants already supported by the calculator:
 
 - `ParagonNodeCoreStat_Normal = 5`;
 - `ParagonNodeCoreStat_Magic = 7`.
 
-Every other Board 01 numerical effect is unresolved rather than treated as zero:
+Magic bonuses and most Rare base magnitudes are now resolved as documented in [`castle-numerical-bonuses.md`](./castle-numerical-bonuses.md). New categories—Physical Damage, Damage to Crowd Controlled, All Resistance, Block Chance, and Block Damage Bonus—remain separate from generic Damage and from one another.
 
-- 25 occupied non-core Magic attributes use unresolved power-budget formulas;
-- all 12 attributes on the six rare nodes are unresolved, including their conditional bonus values and thresholds;
+Remaining unresolved effects are not treated as zero:
+
+- no Magic definition remains numerically unresolved under the calibrated same-revision formula model;
+- Grappler's Rare Minor Damage-to-CC attribute and Stalwart's Rare Minor Block Chance remain unresolved because Rare Minor Offensive has no verified multiplier;
+- all Castle rare conditional activation states remain unresolved because runtime `ParagonBoardEquipIndex` is not modeled, although evidence-supported conditional magnitudes are displayed where available;
 - the Castle legendary passive effect is unresolved and contributes one explicit unresolved record when allocated;
 - glyph effects are not implemented.
 
-Allocating all 191 occupied positions in a calculator validation produces 37 unresolved formula-backed attributes plus one unresolved legendary power, for 38 unresolved bonuses. Verified core-stat totals in that diagnostic are Strength 352, Intelligence 234, Willpower 194, and Dexterity 80. These are a structural calculator check, not a valid connected in-game build total.
+The earlier Phase 10A all-node result of 38 unresolved bonuses is superseded by the Phase 10B validation results below. The all-node diagnostic remains a structural calculator check, not a valid connected in-game build total.
 
 ## Persistence and import/export decisions
 
@@ -82,8 +85,9 @@ Passed:
 5. Board 01 source JSON is semantically identical to the pinned board JSON.
 6. Local HTTP checks returned 200 for the page, JavaScript, both boards, and both node databases.
 7. Calculator regression: all Board 00 nodes still produce Strength 135, Intelligence 84, Willpower 69, Dexterity 30; raw Damage 50%, Damage to Elites 30%, Maximum Life 16%, Total Armor 5%; zero unresolved at zero external attributes. This matches the prior audit.
-8. Board 01 calculator isolation: an allocated gate gives only the verified +5 to each core attribute; the full structural diagnostic reports 38 unresolved effects, including the legendary power.
-9. A minimal DOM/runtime harness executed the real modules and confirmed: Board 00 rendered 75 markers and restored legacy save `[304]`; Board 01 rendered 191 markers, persisted its gate anchor under the separate key, disabled build-file actions, and a Board 01 → Board 00 → Board 01 round trip retained both independent allocations without changing the legacy Board 00 save.
+8. Phase 10B calculator assertions cover every distinct Castle Magic definition, all six Rare nodes, Board 00 Tenacity below/at 630 Strength, allocation/refund recalculation, and unresolved reporting. All passed.
+9. The Phase 10B full structural diagnostic reports core totals Strength 372, Intelligence 234, Willpower 194, and Dexterity 80. It reports eight unresolved effects: two Rare Minor Offensive formulas, five Rare conditional activations, and one legendary power. Only the two Rare values are formula-unresolved.
+10. A Phase 10A minimal DOM/runtime harness executed the real modules and confirmed: Board 00 rendered 75 markers and restored legacy save `[304]`; Board 01 rendered 191 markers, persisted its gate anchor under the separate key, disabled build-file actions, and a Board 01 → Board 00 → Board 01 round trip retained both independent allocations without changing the legacy Board 00 save. Phase 10B does not alter board switching or persistence paths.
 
 Not run:
 
@@ -92,6 +96,6 @@ Not run:
 ## Remaining work
 
 - Perform a live browser pass for Board 00 rendering/calculations, Board 01 rendering, selector interaction, zoom/pan/tooltips, allocation preservation in both directions, and reload persistence.
-- Verify Board 01 Magic, rare, threshold, and legendary values in game before adding numeric registry records.
+- Directly verify formula-derived Castle tooltip values in game if direct Castle provenance is required. Grappler Damage-to-CC, Stalwart Block Chance, all conditional activation boundaries, and the legendary power remain unresolved.
 - Design a backward-compatible multi-board export schema in a later phase that also has an explicit policy for attachment and rotation.
 - Glyph effects, rotation, and board attachment remain intentionally unimplemented.

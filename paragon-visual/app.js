@@ -27,7 +27,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       storageKey: "d4-paragon-paladin-01-v1",
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      calculationScope: "Board 01 totals only pinned core-stat formulas. Other numerical bonuses, thresholds, and the legendary power remain unresolved."
+      calculationScope: "Board 01 includes pinned core stats and formula-derived Magic/Rare base bonuses. Runtime-indexed conditional thresholds and the legendary power remain unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -79,6 +79,16 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       conditional: document.getElementById("raw-elites-conditional"),
       total: document.getElementById("raw-elites-total")
     },
+    physicalDamage: {
+      unconditional: document.getElementById("raw-physical-base"),
+      conditional: document.getElementById("raw-physical-conditional"),
+      total: document.getElementById("raw-physical-total")
+    },
+    damageToCrowdControlled: {
+      unconditional: document.getElementById("raw-cc-base"),
+      conditional: document.getElementById("raw-cc-conditional"),
+      total: document.getElementById("raw-cc-total")
+    },
     maximumLifePercent: {
       unconditional: document.getElementById("raw-life-base"),
       conditional: document.getElementById("raw-life-conditional"),
@@ -88,6 +98,21 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       unconditional: document.getElementById("raw-armor-base"),
       conditional: document.getElementById("raw-armor-conditional"),
       total: document.getElementById("raw-armor-total")
+    },
+    allResistance: {
+      unconditional: document.getElementById("raw-resistance-base"),
+      conditional: document.getElementById("raw-resistance-conditional"),
+      total: document.getElementById("raw-resistance-total")
+    },
+    blockChance: {
+      unconditional: document.getElementById("raw-block-base"),
+      conditional: document.getElementById("raw-block-conditional"),
+      total: document.getElementById("raw-block-total")
+    },
+    blockDamagePercent: {
+      unconditional: document.getElementById("raw-block-damage-base"),
+      conditional: document.getElementById("raw-block-damage-conditional"),
+      total: document.getElementById("raw-block-damage-total")
     }
   };
   const saveStatus = document.getElementById("save-status");
@@ -110,7 +135,11 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     Hitpoints_Max_Percent_Bonus: "Maximum Life",
     Damage_Percent_All_From_Skills: "Damage from Skills",
     Damage_Percent_Bonus_Vs_Elites: "Damage to Elites",
-    Damage_Type_Percent_Bonus: "Damage bonus"
+    Damage_Type_Percent_Bonus: "Physical Damage",
+    Damage_Percent_Bonus_Vs_CC_All: "Damage to Crowd Controlled",
+    Resistance_All_Bonus_Percent: "Resistance to All Elements",
+    Block_Chance: "Block Chance",
+    Block_Damage_Percent_Bonus: "Block Damage Bonus"
   };
   const KIND_LABELS = {
     normal: "Normal",
@@ -181,7 +210,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   function formatBonusValue(value, category) {
     const sign = value > 0 ? "+" : "";
     if (category === "coreAttribute") return `${sign}${value}`;
-    return `${sign}${Number.isInteger(value) ? value : value.toFixed(1)}%`;
+    return `${sign}${Number.isInteger(value) ? value : Number(value.toFixed(2))}%`;
   }
 
   function getThresholdEvaluation(nodeEvaluation, thresholdName) {
@@ -229,8 +258,13 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
             : {
               damage: "Damage",
               damageToElites: "Damage to Elites",
+              physicalDamage: "Physical Damage",
+              damageToCrowdControlled: "Damage to Crowd Controlled",
               maximumLifePercent: "Maximum Life",
-              totalArmorPercent: "Total Armor"
+              totalArmorPercent: "Total Armor",
+              allResistance: "Resistance to All Elements",
+              blockChance: "Block Chance",
+              blockDamagePercent: "Block Damage Bonus"
             }[calculation.category];
           const basePrefix = calculation.provenance === "verified-game-formula"
             ? "Verified bonus"
@@ -269,7 +303,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
                 : calculation.provenance === "unamplified-planner"
                   ? "Unamplified planner observation"
                   : calculation.provenance === "formula-derived"
-                    ? "Formula-derived value"
+                    ? "Pinned formula derived from observed shared multiplier"
                     : "Unspecified evidence source";
             addText(row, "p", "tooltip-evidence", `${evidenceLabel}; glyph amplification is not applied here.`);
           }
@@ -303,9 +337,14 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       const list = document.createElement("ul");
       for (const threshold of definition.thresholdReferences) {
         const evaluation = getThresholdEvaluation(nodeEvaluation, threshold.name);
+        const unresolvedFormula = evaluation?.formula
+          || evaluation?.requirements?.map((requirement) => `${requirement.requiredAttribute}: ${requirement.formula}`).join("; ")
+          || null;
         const label = evaluation?.resolved
           ? `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
-          : `${threshold.name}: not evaluated`;
+          : evaluation
+            ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
+            : `${threshold.name}: not evaluated`;
         const className = evaluation?.resolved
           ? `tooltip-threshold${evaluation.satisfied ? " tooltip-threshold--met" : ""}`
           : "tooltip-threshold tooltip-threshold--unresolved";
