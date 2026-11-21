@@ -1,10 +1,12 @@
 const DIRECT_IN_GAME = "direct-in-game";
 const FORMULA_DERIVED = "formula-derived";
+const UNAMPLIFIED_PLANNER = "unamplified-planner";
 const NO_GLYPH_AMPLIFICATION = false;
 
 export const PARAGON_BONUS_REGISTRY = {
   sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
   boardSnoId: 2436481,
+  observedBoardEquipIndex: 0,
   thresholds: {
     StrengthMain1: {
       snoId: 1015345,
@@ -244,56 +246,59 @@ export const PARAGON_BONUS_REGISTRY = {
 
 // Castle values are board-scoped. Formula-derived values combine the pinned
 // AttributeFormulas coefficient with a multiplier calibrated by the existing
-// direct in-game Board 00 observations. Runtime board equip index is not
-// modeled, so conditional amounts remain reported but cannot activate.
+// direct in-game Board 00 observations. Rare values and requirements are
+// scoped to the user-supplied unamplified Maxroll observation at equip index 1.
 export const CASTLE_BONUS_REGISTRY = {
   sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
   boardSnoId: 2436511,
+  observedBoardEquipIndex: 1,
   thresholds: {
     StrengthMain3: {
       snoId: 1015346,
       requiredAttribute: "Strength",
       requiredAttributeId: 18,
-      requiredValue: null,
+      requiredValue: 1345,
       formula: "890 + (455 * ParagonBoardEquipIndex)",
-      provenance: FORMULA_DERIVED,
-      unresolvedReason: "Castle's runtime ParagonBoardEquipIndex is not modeled."
+      observedBoardEquipIndex: 1,
+      provenance: UNAMPLIFIED_PLANNER
     },
     IntelligenceSide1: {
       snoId: 1015350,
       requiredAttribute: "Intelligence",
       requiredAttributeId: 19,
-      requiredValue: null,
+      requiredValue: 265,
       formula: "190 + (75 * ParagonBoardEquipIndex)",
-      provenance: FORMULA_DERIVED,
-      unresolvedReason: "Castle's runtime ParagonBoardEquipIndex is not modeled."
+      observedBoardEquipIndex: 1,
+      provenance: UNAMPLIFIED_PLANNER
     },
     WillPowerSide3: {
       snoId: 1015322,
       requiredAttribute: "Willpower",
       requiredAttributeId: 20,
-      requiredValue: null,
+      requiredValue: 305,
       formula: "230 + (75 * ParagonBoardEquipIndex)",
-      provenance: FORMULA_DERIVED,
-      unresolvedReason: "Castle's runtime ParagonBoardEquipIndex is not modeled."
+      observedBoardEquipIndex: 1,
+      provenance: UNAMPLIFIED_PLANNER
     },
     "Paladin_Strength+Willpower": {
       snoId: 2504901,
-      requiredValue: null,
+      combination: "all",
       requirements: [
         {
           requiredAttribute: "Strength",
           requiredAttributeId: 18,
+          requiredValue: 1155,
           formula: "700 + (455 * ParagonBoardEquipIndex)"
         },
         {
           requiredAttribute: "Willpower",
           requiredAttributeId: 20,
+          requiredValue: 260,
           formula: "190 + (70 * ParagonBoardEquipIndex)"
         }
       ],
-      provenance: FORMULA_DERIVED,
-      unresolvedReason: "The runtime board equip index and multi-requirement evaluation semantics are not modeled."
+      observedBoardEquipIndex: 1,
+      provenance: UNAMPLIFIED_PLANNER
     }
   },
   nodes: {
@@ -359,8 +364,8 @@ export const CASTLE_BONUS_REGISTRY = {
       sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_005.pgn.json",
       ptBonusAttributeIndices: [0],
       attributes: [
-        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", formulaReference: "ParagonNodeArmorBonus_RareMajor", category: "totalArmorPercent", base: 3, conditional: 3, thresholdReference: "StrengthMain3", provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
-        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", formulaReference: "ParagonNodeArmorBonus_RareMajor", category: "totalArmorPercent", base: 3, conditional: 3, thresholdReference: "StrengthMain3", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     },
     "2449715": {
@@ -369,7 +374,8 @@ export const CASTLE_BONUS_REGISTRY = {
       sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_006.pgn.json",
       ptBonusAttributeIndices: [0],
       attributes: [
-        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "IntelligenceSide1", provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "IntelligenceSide1", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 959, attributeName: "Damage_Percent_Bonus_Vs_CC_All", formulaReference: "ParagonNodeCritDamageToCC_RareMinor", category: "damageToCrowdControlled", base: 10, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     },
     "2449717": {
@@ -378,8 +384,8 @@ export const CASTLE_BONUS_REGISTRY = {
       sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_007.pgn.json",
       ptBonusAttributeIndices: [1],
       attributes: [
-        { attributeIndex: 0, attributeId: 9, attributeName: "Strength_Core", formulaReference: "ParagonNodeCoreStat_RareMajor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
-        { attributeIndex: 1, attributeId: 482, attributeName: "Armor_Percent", formulaReference: "ParagonNodeArmorBonus_RareMinor", category: "totalArmorPercent", base: 2, conditional: 2, thresholdReference: "IntelligenceSide1", provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+        { attributeIndex: 0, attributeId: 9, attributeName: "Strength_Core", formulaReference: "ParagonNodeCoreStat_RareMajor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 482, attributeName: "Armor_Percent", formulaReference: "ParagonNodeArmorBonus_RareMinor", category: "totalArmorPercent", base: 2, conditional: 2, thresholdReference: "IntelligenceSide1", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     },
     "2449719": {
@@ -388,7 +394,8 @@ export const CASTLE_BONUS_REGISTRY = {
       sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_008.pgn.json",
       ptBonusAttributeIndices: [0],
       attributes: [
-        { attributeIndex: 1, attributeId: 335, attributeName: "Block_Damage_Percent_Bonus", formulaReference: "ParagonNodeDamageBonusDot_RareMajor", category: "blockDamagePercent", base: 15, conditional: 0, thresholdReference: null, provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+        { attributeIndex: 0, attributeId: 331, attributeName: "Block_Chance", formulaReference: "ParagonNodeBlockChance_RareMinor", category: "blockChance", base: 2.5, conditional: 2.5, thresholdReference: "WillPowerSide3", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 335, attributeName: "Block_Damage_Percent_Bonus", formulaReference: "ParagonNodeDamageBonusDot_RareMajor", category: "blockedDamageReduction", base: 15, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     },
     "2449721": {
@@ -397,8 +404,8 @@ export const CASTLE_BONUS_REGISTRY = {
       sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_009.pgn.json",
       ptBonusAttributeIndices: [0],
       attributes: [
-        { attributeIndex: 0, attributeId: 959, attributeName: "Damage_Percent_Bonus_Vs_CC_All", formulaReference: "ParagonNodeCritDamageToCC_RareMajor", category: "damageToCrowdControlled", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
-        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+        { attributeIndex: 0, attributeId: 959, attributeName: "Damage_Percent_Bonus_Vs_CC_All", formulaReference: "ParagonNodeCritDamageToCC_RareMajor", category: "damageToCrowdControlled", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     },
     "2449723": {
@@ -407,8 +414,8 @@ export const CASTLE_BONUS_REGISTRY = {
       sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_010.pgn.json",
       ptBonusAttributeIndices: [0],
       attributes: [
-        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
-        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     }
   }

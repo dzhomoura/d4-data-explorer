@@ -16,6 +16,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       boardUrl: "../paladin-board-00.json",
       nodeDatabaseUrl: "node-data.json",
       storageKey: LEGACY_BOARD_00_STORAGE_KEY,
+      boardEquipIndex: 0,
       requiresEntryGate: false,
       supportsBuildFiles: true,
       calculationScope: "Board 00 uses its board-scoped verified bonus registry and pinned core-stat formulas."
@@ -25,9 +26,10 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       boardUrl: "../paladin-board-01.json",
       nodeDatabaseUrl: "node-data-01.json",
       storageKey: "d4-paragon-paladin-01-v1",
+      boardEquipIndex: 1,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      calculationScope: "Board 01 includes pinned core stats and formula-derived Magic/Rare base bonuses. Runtime-indexed conditional thresholds and the legendary power remain unresolved."
+      calculationScope: "Board 01 includes Castle bonuses and conditional thresholds observed unamplified at equip index 1. Other equip positions and the legendary power remain unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -109,7 +111,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       conditional: document.getElementById("raw-block-conditional"),
       total: document.getElementById("raw-block-total")
     },
-    blockDamagePercent: {
+    blockedDamageReduction: {
       unconditional: document.getElementById("raw-block-damage-base"),
       conditional: document.getElementById("raw-block-damage-conditional"),
       total: document.getElementById("raw-block-damage-total")
@@ -139,7 +141,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     Damage_Percent_Bonus_Vs_CC_All: "Damage to Crowd Controlled",
     Resistance_All_Bonus_Percent: "Resistance to All Elements",
     Block_Chance: "Block Chance",
-    Block_Damage_Percent_Bonus: "Block Damage Bonus"
+    Block_Damage_Percent_Bonus: "Blocked Damage Reduction"
   };
   const KIND_LABELS = {
     normal: "Normal",
@@ -264,7 +266,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
               totalArmorPercent: "Total Armor",
               allResistance: "Resistance to All Elements",
               blockChance: "Block Chance",
-              blockDamagePercent: "Block Damage Bonus"
+              blockedDamageReduction: "Blocked Damage Reduction"
             }[calculation.category];
           const basePrefix = calculation.provenance === "verified-game-formula"
             ? "Verified bonus"
@@ -284,7 +286,10 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
             );
             const threshold = calculation.threshold;
             if (threshold?.resolved) {
-              const thresholdText = `${threshold.requiredAttribute} ${threshold.currentValue} / ${threshold.requiredValue} · ${threshold.satisfied ? "satisfied" : `${threshold.remaining} needed`}`;
+              const requirementProgress = threshold.requirements
+                ? threshold.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue} / ${requirement.requiredValue}`).join("; ")
+                : `${threshold.requiredAttribute} ${threshold.currentValue} / ${threshold.requiredValue}`;
+              const thresholdText = `${requirementProgress} · ${threshold.satisfied ? "satisfied" : "not satisfied"}`;
               addText(row, "p", `tooltip-threshold-progress${threshold.satisfied ? " tooltip-threshold-progress--met" : ""}`, thresholdText);
               if (!nodeEvaluation.allocated && threshold.satisfied) {
                 addText(row, "p", "tooltip-formula-note", "Threshold met; bonus applies when this node is allocated.");
@@ -341,7 +346,9 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
           || evaluation?.requirements?.map((requirement) => `${requirement.requiredAttribute}: ${requirement.formula}`).join("; ")
           || null;
         const label = evaluation?.resolved
-          ? `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
+          ? evaluation.requirements
+            ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
+            : `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
           : evaluation
             ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
             : `${threshold.name}: not evaluated`;
@@ -357,7 +364,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
         "tooltip-formula-note",
         currentBoardKey === "board00"
           ? "Only the in-game verified starting-board requirement is evaluated."
-          : "Threshold values and activation are unresolved for this board."
+          : "Castle thresholds are evaluated only for the observed equip-index-1 context."
       );
       tooltip.appendChild(thresholds);
     }
@@ -966,7 +973,8 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       currentBoardDefinition,
       currentNodeDatabase,
       allocatedNodeIds,
-      externalAttributes
+      externalAttributes,
+      { boardEquipIndex: currentBoardConfig.boardEquipIndex }
     );
     currentCalculation = result;
     const attributes = result.verifiedParagonBonuses.coreAttributes;

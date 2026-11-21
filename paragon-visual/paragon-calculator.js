@@ -26,7 +26,7 @@ const BONUS_CATEGORIES = Object.freeze([
   "totalArmorPercent",
   "allResistance",
   "blockChance",
-  "blockDamagePercent"
+  "blockedDamageReduction"
 ]);
 const BOARD_BONUS_REGISTRIES = Object.freeze({
   [PARAGON_BONUS_REGISTRY.boardSnoId]: PARAGON_BONUS_REGISTRY,
@@ -100,6 +100,13 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
   }
 
   const threshold = boardRegistry?.thresholds[record.thresholdReference];
+  if (threshold && threshold.observedBoardEquipIndex !== boardRegistry?.observedBoardEquipIndex) {
+    return {
+      resolved: false,
+      thresholdReference: record.thresholdReference,
+      reason: "No verified threshold is available for this board equip position."
+    };
+  }
   if (threshold && threshold.requiredValue === null) {
     return {
       resolved: false,
@@ -109,6 +116,37 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
       provenance: threshold.provenance,
       formula: threshold.formula || null,
       reason: threshold.unresolvedReason || "The threshold depends on unresolved runtime state."
+    };
+  }
+  if (threshold && Array.isArray(threshold.requirements)) {
+    const requirementsValid = threshold.combination === "all"
+      && threshold.requirements.length > 0
+      && threshold.requirements.every((requirement) => ATTRIBUTE_NAMES.includes(requirement.requiredAttribute)
+        && Number.isSafeInteger(requirement.requiredValue) && requirement.requiredValue >= 0);
+    if (!requirementsValid) {
+      return {
+        resolved: false,
+        thresholdReference: record.thresholdReference,
+        reason: "No verified composite threshold requirement is available for this reference."
+      };
+    }
+    const requirements = threshold.requirements.map((requirement) => {
+      const currentValue = totalAttributes[requirement.requiredAttribute];
+      return {
+        ...requirement,
+        currentValue,
+        remaining: Math.max(0, requirement.requiredValue - currentValue),
+        satisfied: currentValue >= requirement.requiredValue
+      };
+    });
+    return {
+      resolved: true,
+      thresholdReference: record.thresholdReference,
+      combination: "all",
+      requirements,
+      satisfied: requirements.every((requirement) => requirement.satisfied),
+      observedBoardEquipIndex: threshold.observedBoardEquipIndex,
+      provenance: threshold.provenance
     };
   }
   if (!threshold || !ATTRIBUTE_NAMES.includes(threshold.requiredAttribute)
@@ -130,12 +168,19 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
     currentValue,
     remaining: Math.max(0, threshold.requiredValue - currentValue),
     satisfied: currentValue >= threshold.requiredValue,
+    observedBoardEquipIndex: threshold.observedBoardEquipIndex,
     provenance: threshold.provenance,
     formula: threshold.formula
   };
 }
 
-export function calculateParagonBonuses(board, nodeDatabase, allocatedNodeIndices, externalAttributeInput = ZERO_EXTERNAL_ATTRIBUTES) {
+export function calculateParagonBonuses(
+  board,
+  nodeDatabase,
+  allocatedNodeIndices,
+  externalAttributeInput = ZERO_EXTERNAL_ATTRIBUTES,
+  calculationContext = {}
+) {
   const width = Number(board?.nWidth);
   if (!Number.isInteger(width) || width < 1 || !Array.isArray(board.arEntries) || board.arEntries.length < width * width) {
     throw new Error("Calculation requires a valid board width and complete entry grid.");
@@ -146,6 +191,9 @@ export function calculateParagonBonuses(board, nodeDatabase, allocatedNodeIndice
   if (!(allocatedNodeIndices instanceof Set)) {
     throw new Error("Allocated node indices must be provided as a Set.");
   }
+  if (!calculationContext || typeof calculationContext !== "object" || Array.isArray(calculationContext)) {
+    throw new Error("Calculation context must be an object.");
+  }
 
   const definitions = new Map(nodeDatabase.nodes.map((definition) => [definition.name, definition]));
   if (definitions.size !== nodeDatabase.nodes.length) {
@@ -154,10 +202,15 @@ export function calculateParagonBonuses(board, nodeDatabase, allocatedNodeIndice
 
   const externalAttributes = normalizeExternalAttributes(externalAttributeInput);
   const candidateRegistry = BOARD_BONUS_REGISTRIES[board.__snoID__] || null;
+  const boardEquipIndex = calculationContext.boardEquipIndex ?? candidateRegistry?.observedBoardEquipIndex ?? null;
+  if (boardEquipIndex !== null && (!Number.isSafeInteger(boardEquipIndex) || boardEquipIndex < 0)) {
+    throw new Error("Board equip index must be a non-negative whole number.");
+  }
   const boardRegistry = candidateRegistry
     && nodeDatabase.source.commit === candidateRegistry.sourceRevision
     && nodeDatabase.source.boardSnoId === candidateRegistry.boardSnoId
     && board.__snoID__ === candidateRegistry.boardSnoId
+    && boardEquipIndex === candidateRegistry.observedBoardEquipIndex
     ? candidateRegistry
     : null;
   const verifiedFormulas = nodeDatabase.source.formulaSourcePath === FORMULA_SOURCE_PATH
