@@ -7,14 +7,35 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   const MIN_ZOOM = 0.35;
   const MAX_ZOOM = 2.5;
   const ZOOM_STEP = 0.15;
-  const STORAGE_KEY = "d4-paragon-paladin-00-v1";
+  const LEGACY_BOARD_00_STORAGE_KEY = "d4-paragon-paladin-00-v1";
   const EXTERNAL_ATTRIBUTES_STORAGE_KEY = "d4-paragon-paladin-00-external-attributes-v1";
   const BUILD_SCHEMA_VERSION = 1;
+  const BOARD_CONFIGS = Object.freeze({
+    board00: Object.freeze({
+      label: "Board 00 — Starting Board",
+      boardUrl: "../paladin-board-00.json",
+      nodeDatabaseUrl: "node-data.json",
+      storageKey: LEGACY_BOARD_00_STORAGE_KEY,
+      requiresEntryGate: false,
+      supportsBuildFiles: true,
+      calculationScope: "Board 00 uses its board-scoped verified bonus registry and pinned core-stat formulas."
+    }),
+    board01: Object.freeze({
+      label: "Board 01 — Additional Paladin Board",
+      boardUrl: "../paladin-board-01.json",
+      nodeDatabaseUrl: "node-data-01.json",
+      storageKey: "d4-paragon-paladin-01-v1",
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      calculationScope: "Board 01 totals only pinned core-stat formulas. Other numerical bonuses, thresholds, and the legendary power remain unresolved."
+    })
+  });
   const POINT_COSTS = Object.freeze({
     start: 0,
     normal: 1,
     magic: 1,
     rare: 1,
+    legendary: 1,
     socket: 1,
     gate: 1,
     default: 1
@@ -23,6 +44,8 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   const stage = document.getElementById("board-stage");
   const frame = document.getElementById("board-frame");
   const status = document.getElementById("board-status");
+  const boardSelector = document.getElementById("board-selector");
+  const calculationScopeNote = document.getElementById("calculation-scope-note");
   const allocationMessage = document.getElementById("allocation-message");
   const pointsSpent = document.getElementById("points-spent");
   const allocatedCount = document.getElementById("allocated-count");
@@ -93,6 +116,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     normal: "Normal",
     magic: "Magic",
     rare: "Rare",
+    legendary: "Legendary",
     socket: "Glyph socket",
     gate: "Gate",
     start: "Starting node",
@@ -108,13 +132,17 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   let boardNodes = new Map();
   let allocationGraph = new Map();
   let allocatedNodeIds = new Set();
-  let startNodeId = null;
+  let allocationRootId = null;
   let allocatedConnectionLayer = null;
   let boardIdentity = null;
   let currentBoardDefinition = null;
   let currentNodeDatabase = null;
   let externalAttributes = { Strength: 0, Intelligence: 0, Willpower: 0, Dexterity: 0 };
   let currentCalculation = null;
+  let currentBoardKey = "board00";
+  let currentBoardConfig = BOARD_CONFIGS.board00;
+  const boardResources = new Map();
+  const allocationsByBoard = new Map();
 
   function setStatus(message, isError) {
     status.textContent = message;
@@ -284,10 +312,20 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
         addText(list, "li", className, label);
       }
       thresholds.appendChild(list);
-      addText(thresholds, "p", "tooltip-formula-note", "Only the in-game verified starting-board requirement is evaluated.");
+      addText(
+        thresholds,
+        "p",
+        "tooltip-formula-note",
+        currentBoardKey === "board00"
+          ? "Only the in-game verified starting-board requirement is evaluated."
+          : "Threshold values and activation are unresolved for this board."
+      );
       tooltip.appendChild(thresholds);
     }
 
+    if (definition.passivePower) {
+      addText(tooltip, "p", "tooltip-trait", `Legendary power: ${definition.passivePower.name} (effect unresolved)`);
+    }
     if (definition.hasSocket) addText(tooltip, "p", "tooltip-trait", "Glyph socket");
     if (definition.isGate) addText(tooltip, "p", "tooltip-trait", "Board gate");
   }
@@ -336,7 +374,9 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     applyTransform();
   }
 
-  function renderBoard(board, database) {
+  function renderBoard(boardKey, board, database) {
+    const config = BOARD_CONFIGS[boardKey];
+    if (!config) throw new Error(`Unknown board key: ${boardKey}.`);
     const width = Number(board.nWidth);
     if (!Number.isInteger(width) || width < 1 || !Array.isArray(board.arEntries) || board.arEntries.length < width * width) {
       throw new Error("Board data must include a valid nWidth and a complete arEntries grid.");
@@ -383,7 +423,12 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     }
 
     const startingNodes = [...nextBoardNodes.values()].filter((node) => node.definition.kind === "start");
-    if (startingNodes.length !== 1) {
+    const gateNodes = [...nextBoardNodes.values()].filter((node) => node.definition.kind === "gate");
+    if (config.requiresEntryGate) {
+      if (startingNodes.length !== 0 || gateNodes.length === 0) {
+        throw new Error(`Additional board must have no starting node and at least one gate; found ${startingNodes.length} starting nodes and ${gateNodes.length} gates.`);
+      }
+    } else if (startingNodes.length !== 1) {
       throw new Error(`Expected exactly one starting node; found ${startingNodes.length}.`);
     }
     const nextGraph = new Map();
@@ -398,8 +443,10 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
 
     boardNodes = nextBoardNodes;
     allocationGraph = nextGraph;
-    startNodeId = startingNodes[0].id;
-    allocatedNodeIds = new Set([startNodeId]);
+    currentBoardKey = boardKey;
+    currentBoardConfig = config;
+    allocationRootId = config.requiresEntryGate ? null : startingNodes[0].id;
+    allocatedNodeIds = allocationRootId === null ? new Set() : new Set([allocationRootId]);
     boardIdentity = {
       identifier: board.__fileName__,
       snoId: board.__snoID__,
@@ -407,6 +454,14 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     };
     currentBoardDefinition = board;
     currentNodeDatabase = database;
+    calculationScopeNote.textContent = config.calculationScope;
+    exportBuildButton.disabled = !config.supportsBuildFiles;
+    importBuildButton.disabled = !config.supportsBuildFiles;
+    const buildActionTitle = config.supportsBuildFiles
+      ? ""
+      : "Multi-board import/export is deferred to preserve the Board 00 schema.";
+    exportBuildButton.title = buildActionTitle;
+    importBuildButton.title = buildActionTitle;
 
     boardSize = width * CELL_SIZE;
     const grid = document.createElement("div");
@@ -494,7 +549,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     grid.prepend(allocatedConnections);
     grid.prepend(connections);
     frame.replaceChildren(grid);
-    setStatus(`${width} × ${width} board · ${entries.slice(0, width * width).filter(Boolean).length} occupied nodes · ${nodeDefinitions.size} definitions`);
+    setStatus(`${config.label} · ${width} × ${width} · ${entries.slice(0, width * width).filter(Boolean).length} occupied nodes · ${nodeDefinitions.size} definitions`);
     updateAllocationDisplay();
     restoreSavedAllocation();
 
@@ -523,10 +578,10 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     return eligible;
   }
 
-  function getReachableAllocatedNodeIds(allocatedIds) {
-    if (startNodeId === null || !allocatedIds.has(startNodeId)) return new Set();
-    const reachable = new Set([startNodeId]);
-    const pending = [startNodeId];
+  function getReachableAllocatedNodeIds(allocatedIds, rootId = allocationRootId) {
+    if (rootId === null || !allocatedIds.has(rootId)) return new Set();
+    const reachable = new Set([rootId]);
+    const pending = [rootId];
     for (let cursor = 0; cursor < pending.length; cursor += 1) {
       const currentId = pending[cursor];
       for (const neighborId of allocationGraph.get(currentId) || []) {
@@ -539,7 +594,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     return reachable;
   }
 
-  function validateAllocatedNodeIndices(indices) {
+  function validateAllocatedNodeIndices(indices, rootId = allocationRootId) {
     if (!Array.isArray(indices)) {
       throw new Error("Allocated node indices must be an array.");
     }
@@ -554,11 +609,17 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       }
       validated.add(id);
     }
-    if (!validated.has(startNodeId)) {
-      throw new Error("The allocation does not include the starting node.");
+    if (rootId === null) {
+      if (validated.size !== 0) throw new Error("An entry gate is required before allocating this board.");
+      return validated;
+    }
+    if (!validated.has(rootId)) {
+      throw new Error(currentBoardConfig.requiresEntryGate
+        ? "The allocation does not include its entry gate."
+        : "The allocation does not include the starting node.");
     }
 
-    const reachable = getReachableAllocatedNodeIds(validated);
+    const reachable = getReachableAllocatedNodeIds(validated, rootId);
     if (reachable.size !== validated.size) {
       throw new Error("The allocation contains nodes disconnected from the starting node.");
     }
@@ -566,9 +627,25 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   }
 
   function restoreSavedAllocation() {
+    const memoryAllocation = allocationsByBoard.get(currentBoardKey);
+    if (memoryAllocation) {
+      try {
+        allocationRootId = memoryAllocation.rootId;
+        allocatedNodeIds = validateAllocatedNodeIndices(memoryAllocation.indices, allocationRootId);
+        updateAllocationDisplay();
+        setSaveStatus("Saved locally", "saved");
+        setAllocationMessage(currentBoardConfig.requiresEntryGate
+          ? "Restored this board's independent allocation."
+          : "Restored saved allocation.");
+        return;
+      } catch (error) {
+        allocationsByBoard.delete(currentBoardKey);
+      }
+    }
+
     let serialized;
     try {
-      serialized = window.localStorage.getItem(STORAGE_KEY);
+      serialized = window.localStorage.getItem(currentBoardConfig.storageKey);
     } catch (error) {
       setSaveStatus("Storage unavailable", "error");
       setAllocationMessage(`Could not read saved allocation: ${error.message}`, true);
@@ -577,15 +654,37 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
 
     if (serialized === null) {
       setSaveStatus("Not saved yet", "unsaved");
-      setAllocationMessage("Starting node is active.");
+      setAllocationMessage(currentBoardConfig.requiresEntryGate
+        ? "Choose a gate as this board's local entry anchor. Board attachment and rotation are not modeled."
+        : "Starting node is active.");
+      allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices: [...allocatedNodeIds] });
       return;
     }
 
     let restored;
     try {
-      restored = validateAllocatedNodeIndices(JSON.parse(serialized));
+      const parsed = JSON.parse(serialized);
+      if (currentBoardConfig.requiresEntryGate) {
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)
+          || !Array.isArray(parsed.allocatedNodeIndices)) {
+          throw new Error("Additional-board save must include an entry gate and allocated node indices.");
+        }
+        if (parsed.entryNodeIndex === null && parsed.allocatedNodeIndices.length === 0) {
+          allocationRootId = null;
+        } else {
+          const entryNode = boardNodes.get(parsed.entryNodeIndex);
+          if (!Number.isInteger(parsed.entryNodeIndex) || !entryNode || entryNode.definition.kind !== "gate") {
+            throw new Error("Saved entry node is not a gate on this board.");
+          }
+          allocationRootId = parsed.entryNodeIndex;
+        }
+        restored = validateAllocatedNodeIndices(parsed.allocatedNodeIndices, allocationRootId);
+      } else {
+        restored = validateAllocatedNodeIndices(parsed, allocationRootId);
+      }
     } catch (error) {
-      allocatedNodeIds = new Set([startNodeId]);
+      allocationRootId = currentBoardConfig.requiresEntryGate ? null : allocationRootId;
+      allocatedNodeIds = allocationRootId === null ? new Set() : new Set([allocationRootId]);
       updateAllocationDisplay();
       setSaveStatus("Invalid save rejected", "error");
       setAllocationMessage(`Saved allocation rejected; starting node only. ${error.message}`, true);
@@ -593,6 +692,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     }
 
     allocatedNodeIds = restored;
+    allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices: [...allocatedNodeIds] });
     updateAllocationDisplay();
     setSaveStatus("Saved locally", "saved");
     setAllocationMessage("Restored saved allocation.");
@@ -600,8 +700,12 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
 
   function saveAllocation() {
     const indices = [...allocatedNodeIds].sort((a, b) => a - b);
+    allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices });
+    const persistedValue = currentBoardConfig.requiresEntryGate
+      ? { entryNodeIndex: allocationRootId, allocatedNodeIndices: indices }
+      : indices;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(indices));
+      window.localStorage.setItem(currentBoardConfig.storageKey, JSON.stringify(persistedValue));
     } catch (error) {
       setSaveStatus("Save failed", "error");
       setAllocationMessage(`Allocation changed, but could not be saved: ${error.message}`, true);
@@ -696,6 +800,9 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   }
 
   function validateImportedBuild(build) {
+    if (!currentBoardConfig.supportsBuildFiles) {
+      throw new Error("Multi-board import is deferred; Board 00 schema version 1 remains unchanged.");
+    }
     if (!build || typeof build !== "object" || Array.isArray(build)) {
       throw new Error("Build must be a JSON object.");
     }
@@ -745,6 +852,10 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   }
 
   function exportBuild() {
+    if (!currentBoardConfig.supportsBuildFiles) {
+      setAllocationMessage("Board 01 export is deferred until a safe multi-board build schema is defined.", true);
+      return;
+    }
     const build = {
       schemaVersion: BUILD_SCHEMA_VERSION,
       boardIdentifier: boardIdentity.identifier,
@@ -854,6 +965,20 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       setAllocationMessage("That node is already allocated.");
       return;
     }
+    if (allocationRootId === null) {
+      const node = boardNodes.get(id);
+      if (!currentBoardConfig.requiresEntryGate || node?.definition.kind !== "gate") {
+        setAllocationMessage("Choose one of this board's gates as the local entry anchor before allocating adjacent nodes.", true);
+        return;
+      }
+      allocationRootId = id;
+      allocatedNodeIds.add(id);
+      updateAllocationDisplay();
+      if (saveAllocation()) {
+        setAllocationMessage(`Selected ${node.definition.name} as this board's local entry anchor. Boards remain unattached.`);
+      }
+      return;
+    }
     if (!(allocationGraph.get(id) || []).some((neighborId) => allocatedNodeIds.has(neighborId))) {
       setAllocationMessage("Cannot allocate that node: it is not orthogonally connected to the allocated path.", true);
       return;
@@ -864,8 +989,10 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   }
 
   function refundNode(id) {
-    if (id === startNodeId) {
-      setAllocationMessage("The starting node cannot be refunded.", true);
+    if (id === allocationRootId) {
+      setAllocationMessage(currentBoardConfig.requiresEntryGate
+        ? "The entry gate cannot be refunded while it anchors this board. Use Reset Allocation to choose another gate."
+        : "The starting node cannot be refunded.", true);
       return;
     }
     if (!allocatedNodeIds.has(id)) {
@@ -887,10 +1014,14 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   }
 
   function resetAllocation() {
-    if (startNodeId === null) return;
-    allocatedNodeIds = new Set([startNodeId]);
+    allocationRootId = currentBoardConfig.requiresEntryGate ? null : allocationRootId;
+    allocatedNodeIds = allocationRootId === null ? new Set() : new Set([allocationRootId]);
     updateAllocationDisplay();
-    if (saveAllocation()) setAllocationMessage("Allocation reset. Starting node is active.");
+    if (saveAllocation()) {
+      setAllocationMessage(currentBoardConfig.requiresEntryGate
+        ? "Allocation reset. Choose a gate as this board's local entry anchor."
+        : "Allocation reset. Starting node is active.");
+    }
   }
 
   allocationResetButton.addEventListener("click", resetAllocation);
@@ -900,6 +1031,23 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     const file = buildFileInput.files?.[0];
     if (file) await importBuildFile(file);
     buildFileInput.value = "";
+  });
+  boardSelector.addEventListener("change", () => {
+    const boardKey = boardSelector.value;
+    const resource = boardResources.get(boardKey);
+    if (!resource) {
+      setStatus(`Board data is not loaded for ${boardKey}.`, true);
+      return;
+    }
+    hideTooltip();
+    panX = 0;
+    panY = 0;
+    try {
+      renderBoard(boardKey, resource.board, resource.database);
+    } catch (error) {
+      console.error("Could not switch Paragon boards:", error);
+      setStatus(`Could not render selected board. (${error.message})`, true);
+    }
   });
   for (const input of Object.values(externalAttributeInputs)) {
     input.addEventListener("input", updateExternalAttributesFromInputs);
@@ -948,18 +1096,37 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     if (activeTooltipMarker) positionTooltip(activeTooltipMarker);
   });
 
-  Promise.all([
-    fetch("../paladin-board-00.json"),
-    fetch("node-data.json")
-  ])
-    .then(async ([boardResponse, databaseResponse]) => {
-      if (!boardResponse.ok) throw new Error(`Board request failed (${boardResponse.status}).`);
-      if (!databaseResponse.ok) throw new Error(`Node database request failed (${databaseResponse.status}).`);
-      return Promise.all([boardResponse.json(), databaseResponse.json()]);
-    })
-    .then(([board, database]) => renderBoard(board, database))
-    .catch((error) => {
-      console.error("Could not load the Paragon board:", error);
-      setStatus(`Could not load board data. Serve the project over HTTP and check the local JSON files. (${error.message})`, true);
-    });
+  async function loadBoardResource(boardKey) {
+    const config = BOARD_CONFIGS[boardKey];
+    const [boardResponse, databaseResponse] = await Promise.all([
+      fetch(config.boardUrl),
+      fetch(config.nodeDatabaseUrl)
+    ]);
+    if (!boardResponse.ok) throw new Error(`${config.label} request failed (${boardResponse.status}).`);
+    if (!databaseResponse.ok) throw new Error(`${config.label} node database request failed (${databaseResponse.status}).`);
+    const [board, database] = await Promise.all([boardResponse.json(), databaseResponse.json()]);
+    return { board, database };
+  }
+
+  (async () => {
+    try {
+      const startingBoard = await loadBoardResource("board00");
+      boardResources.set("board00", startingBoard);
+      renderBoard("board00", startingBoard.board, startingBoard.database);
+    } catch (error) {
+      console.error("Could not load the starting Paragon board:", error);
+      setStatus(`Could not load Board 00 data. Serve the project over HTTP and check the local JSON files. (${error.message})`, true);
+      return;
+    }
+
+    try {
+      const additionalBoard = await loadBoardResource("board01");
+      boardResources.set("board01", additionalBoard);
+      const board01Option = boardSelector.querySelector('option[value="board01"]');
+      if (board01Option) board01Option.disabled = false;
+    } catch (error) {
+      console.error("Could not load the additional Paladin board:", error);
+      setAllocationMessage(`Board 00 is available, but Board 01 could not be loaded. (${error.message})`, true);
+    }
+  })();
 })();

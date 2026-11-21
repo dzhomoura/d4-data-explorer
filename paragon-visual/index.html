@@ -14,6 +14,13 @@
           <p class="eyebrow">Sanctuary · Character Progression</p>
           <h1>Paragon Board</h1>
           <p id="board-status" class="board-status" role="status">Loading board…</p>
+          <label class="board-selector-label" for="board-selector">
+            Board
+            <select id="board-selector">
+              <option value="board00">Board 00 — Starting Board</option>
+              <option value="board01" disabled>Board 01 — Additional Paladin Board</option>
+            </select>
+          </label>
         </div>
         <div class="zoom-controls" aria-label="Board zoom controls">
           <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
@@ -59,6 +66,7 @@
             <div>
               <h2 id="attribute-panel-title">Verified Paragon bonuses</h2>
               <p>Bonuses from allocated Paragon nodes only; these are not your complete character attributes.</p>
+              <p id="calculation-scope-note" class="calculation-scope-note">Loading calculation scope…</p>
             </div>
             <p class="unresolved-summary">Unresolved bonuses <strong id="unresolved-bonus-count">0</strong></p>
           </div>
@@ -123,7 +131,8 @@
           <div id="legend" class="legend" aria-label="Node color legend">
             <span class="legend-item"><i class="swatch swatch--normal"></i>Normal</span>
             <span class="legend-item"><i class="swatch swatch--magic"></i>Magic</span>
-            <span class="legend-item"><i class="swatch swatch--rare"></i>Rare / Legendary</span>
+            <span class="legend-item"><i class="swatch swatch--rare"></i>Rare</span>
+            <span class="legend-item"><i class="swatch swatch--legendary"></i>Legendary</span>
             <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
             <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
             <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>

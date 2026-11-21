@@ -189,6 +189,18 @@ export function calculateParagonBonuses(board, nodeDatabase, allocatedNodeIndice
     const registeredAttributes = new Map();
     registeredAttributesByNode.set(index, registeredAttributes);
 
+    if (definition.passivePower && !nodeRecord) {
+      addUnresolved(
+        index,
+        definition,
+        { name: "Legendary_Power", formulaReference: null, formulaValue: null, literalFormula: null },
+        -1,
+        `Legendary power ${definition.passivePower.name} has no verified numerical model for this board.`,
+        false,
+        false
+      );
+    }
+
     for (let attributeIndex = 0; attributeIndex < definition.attributes.length; attributeIndex += 1) {
       const attribute = definition.attributes[attributeIndex];
       const formulaReference = attribute.formulaReference || null;
@@ -349,10 +361,10 @@ export function calculateParagonBonuses(board, nodeDatabase, allocatedNodeIndice
     nodeEvaluations.push({
       nodeIndex: index,
       nodeName: definition.name,
-      displayName: nodeRecord?.displayName || null,
+      displayName: nodeRecord?.displayName || definition.displayName || null,
       snoId: definition.snoId,
       allocated: isAllocated,
-      ptBonusAttributeIndices: nodeRecord?.ptBonusAttributeIndices || [],
+      ptBonusAttributeIndices: nodeRecord?.ptBonusAttributeIndices || definition.ptBonusAttributeIndices || [],
       attributes: attributeEvaluations,
       thresholds: thresholdEvaluations
     });
