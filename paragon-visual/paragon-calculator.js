@@ -1,0 +1,396 @@
+import { PARAGON_BONUS_REGISTRY } from "./paragon-bonus-registry.js";
+
+const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
+const VERIFIED_FORMULAS_BY_REVISION = new Map([
+  [
+    "75e619f0d90a0951945747f45feef59c076a5db0",
+    new Map([
+      ["ParagonNodeCoreStat_Normal", 5],
+      ["ParagonNodeCoreStat_Magic", 7]
+    ])
+  ]
+]);
+const CORE_ATTRIBUTES = Object.freeze({
+  Strength_Core: "Strength",
+  Intelligence_Core: "Intelligence",
+  Willpower_Core: "Willpower",
+  Dexterity_Core: "Dexterity"
+});
+const ATTRIBUTE_NAMES = Object.freeze(["Strength", "Intelligence", "Willpower", "Dexterity"]);
+const BONUS_CATEGORIES = Object.freeze([
+  "damage",
+  "damageToElites",
+  "maximumLifePercent",
+  "totalArmorPercent"
+]);
+const ZERO_EXTERNAL_ATTRIBUTES = Object.freeze({
+  Strength: 0,
+  Intelligence: 0,
+  Willpower: 0,
+  Dexterity: 0
+});
+
+function normalizeExternalAttributes(externalAttributes) {
+  if (!externalAttributes || typeof externalAttributes !== "object" || Array.isArray(externalAttributes)) {
+    throw new Error("External attributes must be provided as an attribute object.");
+  }
+
+  const normalized = {};
+  for (const name of ATTRIBUTE_NAMES) {
+    const value = externalAttributes[name];
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new Error(`External ${name} must be a non-negative whole number.`);
+    }
+    normalized[name] = value;
+  }
+  return normalized;
+}
+
+function createBonusTotals() {
+  return Object.fromEntries(BONUS_CATEGORIES.map((category) => [
+    category,
+    { unconditional: 0, conditional: 0, total: 0 }
+  ]));
+}
+
+function getRegistryNode(definition, registryAvailable) {
+  if (!registryAvailable) return null;
+  const record = PARAGON_BONUS_REGISTRY.nodes[String(definition.snoId)];
+  return record && record.name === definition.name ? record : null;
+}
+
+function getRegisteredAttribute(nodeRecord, attribute, attributeIndex) {
+  if (!nodeRecord) return null;
+  const record = nodeRecord.attributes.find((candidate) => candidate.attributeIndex === attributeIndex);
+  if (!record) return null;
+  if (record.attributeId !== attribute.id
+    || record.attributeName !== attribute.name
+    || record.formulaReference !== (attribute.formulaReference || null)) {
+    return { invalid: true, record };
+  }
+  return { invalid: false, record };
+}
+
+function evaluateThreshold(definition, nodeRecord, record, totalAttributes) {
+  if (!record.thresholdReference) {
+    return { resolved: false, thresholdReference: null, reason: "Conditional bonus has no threshold reference." };
+  }
+  if (!nodeRecord?.ptBonusAttributeIndices?.includes(record.attributeIndex)) {
+    return {
+      resolved: false,
+      thresholdReference: record.thresholdReference,
+      reason: "Attribute index is not marked by ptBonusAttributeIndices."
+    };
+  }
+  if (!definition.thresholdReferences.some((threshold) => threshold.name === record.thresholdReference)) {
+    return {
+      resolved: false,
+      thresholdReference: record.thresholdReference,
+      reason: "Threshold reference is not present on this node definition."
+    };
+  }
+
+  const threshold = PARAGON_BONUS_REGISTRY.thresholds[record.thresholdReference];
+  if (!threshold || !ATTRIBUTE_NAMES.includes(threshold.requiredAttribute)
+    || !Number.isSafeInteger(threshold.requiredValue) || threshold.requiredValue < 0) {
+    return {
+      resolved: false,
+      thresholdReference: record.thresholdReference,
+      reason: "No verified threshold requirement is available for this reference."
+    };
+  }
+
+  const currentValue = totalAttributes[threshold.requiredAttribute];
+  return {
+    resolved: true,
+    thresholdReference: record.thresholdReference,
+    requiredAttribute: threshold.requiredAttribute,
+    requiredAttributeId: threshold.requiredAttributeId,
+    requiredValue: threshold.requiredValue,
+    currentValue,
+    remaining: Math.max(0, threshold.requiredValue - currentValue),
+    satisfied: currentValue >= threshold.requiredValue,
+    provenance: threshold.provenance,
+    formula: threshold.formula
+  };
+}
+
+export function calculateParagonBonuses(board, nodeDatabase, allocatedNodeIndices, externalAttributeInput = ZERO_EXTERNAL_ATTRIBUTES) {
+  const width = Number(board?.nWidth);
+  if (!Number.isInteger(width) || width < 1 || !Array.isArray(board.arEntries) || board.arEntries.length < width * width) {
+    throw new Error("Calculation requires a valid board width and complete entry grid.");
+  }
+  if (!nodeDatabase || !Array.isArray(nodeDatabase.nodes) || !nodeDatabase.source) {
+    throw new Error("Calculation requires a resolved node database and source metadata.");
+  }
+  if (!(allocatedNodeIndices instanceof Set)) {
+    throw new Error("Allocated node indices must be provided as a Set.");
+  }
+
+  const definitions = new Map(nodeDatabase.nodes.map((definition) => [definition.name, definition]));
+  if (definitions.size !== nodeDatabase.nodes.length) {
+    throw new Error("Node database contains duplicate definitions.");
+  }
+
+  const externalAttributes = normalizeExternalAttributes(externalAttributeInput);
+  const registryAvailable = nodeDatabase.source.commit === PARAGON_BONUS_REGISTRY.sourceRevision
+    && nodeDatabase.source.boardSnoId === PARAGON_BONUS_REGISTRY.boardSnoId
+    && board.__snoID__ === PARAGON_BONUS_REGISTRY.boardSnoId;
+  const verifiedFormulas = nodeDatabase.source.formulaSourcePath === FORMULA_SOURCE_PATH
+    ? VERIFIED_FORMULAS_BY_REVISION.get(nodeDatabase.source.commit)
+    : null;
+  const coreAttributes = {
+    Strength: 0,
+    Intelligence: 0,
+    Willpower: 0,
+    Dexterity: 0
+  };
+  const bonusTotals = createBonusTotals();
+  const verifiedDetails = [];
+  const registeredAttributesByNode = new Map();
+  const thresholdResultsByAttribute = new Map();
+  const unresolvedByBonus = new Map();
+
+  function addUnresolved(nodeIndex, definition, attribute, attributeIndex, reason, conditional, formulaUnresolved = true) {
+    const key = `${nodeIndex}:${attributeIndex}`;
+    if (unresolvedByBonus.has(key)) return;
+    unresolvedByBonus.set(key, {
+      nodeIndex,
+      nodeName: definition.name,
+      attributeName: attribute.name,
+      formulaReference: attribute.formulaReference || null,
+      formulaValue: attribute.formulaValue ?? null,
+      nodeLiteral: attribute.literalFormula || null,
+      thresholdReferences: definition.thresholdReferences.map((threshold) => threshold.name),
+      reason,
+      formulaUnresolved,
+      conditional: Boolean(conditional)
+    });
+  }
+
+  for (const index of allocatedNodeIndices) {
+    if (!Number.isInteger(index) || index < 0 || index >= width * width) {
+      throw new Error(`Allocated node index ${String(index)} is outside the board.`);
+    }
+
+    const entry = board.arEntries[index];
+    if (!entry || typeof entry.name !== "string") {
+      throw new Error(`Allocated node index ${index} is empty on this board.`);
+    }
+    const definition = definitions.get(entry.name);
+    if (!definition || definition.snoId !== entry.__raw__) {
+      throw new Error(`Resolved node definition is missing or mismatched for ${entry.name}.`);
+    }
+    if (!Array.isArray(definition.attributes) || !Array.isArray(definition.thresholdReferences)) {
+      throw new Error(`Node definition ${definition.name} has an invalid attribute or threshold list.`);
+    }
+
+    const nodeRecord = getRegistryNode(definition, registryAvailable);
+    const registeredAttributes = new Map();
+    registeredAttributesByNode.set(index, registeredAttributes);
+
+    for (let attributeIndex = 0; attributeIndex < definition.attributes.length; attributeIndex += 1) {
+      const attribute = definition.attributes[attributeIndex];
+      const formulaReference = attribute.formulaReference || null;
+      const registered = getRegisteredAttribute(nodeRecord, attribute, attributeIndex);
+      if (registered?.invalid) {
+        addUnresolved(index, definition, attribute, attributeIndex, "Observed bonus registry does not match the node attribute identity.", false);
+        continue;
+      }
+      if (registered) {
+        const record = registered.record;
+        if (!Number.isFinite(record.base) || record.base < 0
+          || !Number.isFinite(record.conditional) || record.conditional < 0
+          || (record.category !== "coreAttribute" && !BONUS_CATEGORIES.includes(record.category))) {
+          addUnresolved(index, definition, attribute, attributeIndex, "Observed bonus registry contains an invalid value or category.", record.conditional > 0);
+          continue;
+        }
+        registeredAttributes.set(attributeIndex, record);
+        if (record.category === "coreAttribute") {
+          const resultAttribute = CORE_ATTRIBUTES[attribute.name];
+          if (!resultAttribute) {
+            addUnresolved(index, definition, attribute, attributeIndex, "Registered core attribute does not map to a supported total.", false);
+            continue;
+          }
+          coreAttributes[resultAttribute] += record.base;
+        } else {
+          bonusTotals[record.category].unconditional += record.base;
+        }
+        if (record.category === "coreAttribute") {
+          verifiedDetails.push({
+            nodeIndex: index,
+            nodeName: definition.name,
+            attributeName: attribute.name,
+            formulaReference,
+            value: record.base,
+            provenance: record.provenance
+          });
+        }
+        continue;
+      }
+
+      const verifiedValue = formulaReference && verifiedFormulas
+        ? verifiedFormulas.get(formulaReference)
+        : undefined;
+      const isVerifiedFormula = Number.isFinite(verifiedValue)
+        && attribute.formulaValue === verifiedValue
+        && attribute.verifiedBonus === verifiedValue;
+      const resultAttribute = CORE_ATTRIBUTES[attribute.name];
+      if (!isVerifiedFormula || !resultAttribute || definition.thresholdReferences.length > 0) {
+        const reason = !verifiedFormulas
+          ? "No verified formula registry is available for this source revision."
+          : !formulaReference || !Number.isFinite(verifiedValue)
+            ? "Formula reference has no verified numerical value."
+            : !resultAttribute
+              ? "This calculator does not yet resolve this attribute."
+              : definition.thresholdReferences.length > 0
+                ? "Thresholded attribute is not in the observed bonus registry."
+                : "Node formula metadata does not match the verified numerical value.";
+        addUnresolved(index, definition, attribute, attributeIndex, reason, definition.thresholdReferences.length > 0);
+        continue;
+      }
+
+      coreAttributes[resultAttribute] += verifiedValue;
+      verifiedDetails.push({
+        nodeIndex: index,
+        nodeName: definition.name,
+        attributeName: attribute.name,
+        formulaReference,
+        value: verifiedValue,
+        provenance: "verified-game-formula"
+      });
+    }
+  }
+
+  function getTotalAttributes() {
+    return Object.fromEntries(ATTRIBUTE_NAMES.map((name) => [name, externalAttributes[name] + coreAttributes[name]]));
+  }
+
+  let totalAttributes = getTotalAttributes();
+  for (const index of allocatedNodeIndices) {
+    const entry = board.arEntries[index];
+    const definition = definitions.get(entry.name);
+    const nodeRecord = getRegistryNode(definition, registryAvailable);
+    const registeredAttributes = registeredAttributesByNode.get(index);
+    for (const [attributeIndex, record] of registeredAttributes) {
+      if (record.conditional <= 0) continue;
+      const threshold = evaluateThreshold(definition, nodeRecord, record, totalAttributes);
+      thresholdResultsByAttribute.set(`${index}:${attributeIndex}`, threshold);
+      if (!threshold.resolved) {
+        addUnresolved(index, definition, definition.attributes[attributeIndex], attributeIndex, threshold.reason, true, false);
+        continue;
+      }
+      if (!threshold.satisfied) continue;
+      if (record.category === "coreAttribute") {
+        const resultAttribute = CORE_ATTRIBUTES[definition.attributes[attributeIndex].name];
+        coreAttributes[resultAttribute] += record.conditional;
+      } else {
+        bonusTotals[record.category].conditional += record.conditional;
+      }
+    }
+  }
+  totalAttributes = getTotalAttributes();
+
+  const nodeEvaluations = [];
+  for (let index = 0; index < width * width; index += 1) {
+    const entry = board.arEntries[index];
+    if (!entry) continue;
+    const definition = definitions.get(entry.name);
+    const nodeRecord = getRegistryNode(definition, registryAvailable);
+    const isAllocated = allocatedNodeIndices.has(index);
+    const attributeEvaluations = [];
+    const thresholdEvaluations = [];
+
+    for (let attributeIndex = 0; attributeIndex < definition.attributes.length; attributeIndex += 1) {
+      const attribute = definition.attributes[attributeIndex];
+      const registered = getRegisteredAttribute(nodeRecord, attribute, attributeIndex);
+      const formulaReference = attribute.formulaReference || null;
+      const verifiedValue = formulaReference && verifiedFormulas ? verifiedFormulas.get(formulaReference) : undefined;
+      const isVerifiedFormula = Number.isFinite(verifiedValue)
+        && attribute.formulaValue === verifiedValue
+        && attribute.verifiedBonus === verifiedValue;
+      const resultAttribute = CORE_ATTRIBUTES[attribute.name];
+      let record = registered && !registered.invalid ? registered.record : null;
+      let unconditional = null;
+      let conditional = 0;
+      let provenance = null;
+
+      if (record) {
+        unconditional = record.base;
+        conditional = record.conditional;
+        provenance = record.provenance;
+      } else if (isVerifiedFormula && resultAttribute && definition.thresholdReferences.length === 0) {
+        unconditional = verifiedValue;
+        provenance = "verified-game-formula";
+      }
+
+      let threshold = null;
+      if (record?.conditional > 0) {
+        threshold = thresholdResultsByAttribute.get(`${index}:${attributeIndex}`)
+          || evaluateThreshold(definition, nodeRecord, record, totalAttributes);
+        thresholdEvaluations.push(threshold);
+      }
+      attributeEvaluations.push({
+        attributeIndex,
+        attributeId: attribute.id,
+        attributeName: attribute.name,
+        formulaReference,
+        category: record?.category || (resultAttribute ? "coreAttribute" : null),
+        unconditional,
+        conditional,
+        thresholdReference: record?.thresholdReference || null,
+        conditionalApplied: Boolean(isAllocated && threshold?.resolved && threshold.satisfied),
+        threshold,
+        provenance,
+        unresolved: unconditional === null
+      });
+    }
+
+    nodeEvaluations.push({
+      nodeIndex: index,
+      nodeName: definition.name,
+      displayName: nodeRecord?.displayName || null,
+      snoId: definition.snoId,
+      allocated: isAllocated,
+      ptBonusAttributeIndices: nodeRecord?.ptBonusAttributeIndices || [],
+      attributes: attributeEvaluations,
+      thresholds: thresholdEvaluations
+    });
+  }
+
+  for (const category of BONUS_CATEGORIES) {
+    const totals = bonusTotals[category];
+    totals.total = totals.unconditional + totals.conditional;
+  }
+
+  const unresolvedBonuses = [...unresolvedByBonus.values()];
+  const unresolvedFormulaReferences = unresolvedBonuses.filter((bonus) => bonus.formulaUnresolved);
+  const conditionalBonuses = nodeEvaluations.flatMap((node) => node.attributes
+    .filter((attribute) => attribute.conditional > 0)
+    .map((attribute) => ({
+      nodeIndex: node.nodeIndex,
+      nodeName: node.nodeName,
+      attributeName: attribute.attributeName,
+      conditionalValue: attribute.conditional,
+      threshold: attribute.threshold,
+      applied: attribute.conditionalApplied
+    })));
+  const totalCoreAttributes = Object.values(coreAttributes).reduce((total, value) => total + value, 0);
+
+  return {
+    sourceRevision: nodeDatabase.source.commit,
+    allocatedNodeCount: allocatedNodeIndices.size,
+    externalAttributes,
+    totalAttributes,
+    nodeEvaluations,
+    verifiedParagonBonuses: {
+      coreAttributes,
+      totalCoreAttributes,
+      rawBonuses: bonusTotals,
+      details: verifiedDetails
+    },
+    unresolvedFormulaReferences,
+    conditionalBonuses,
+    unresolvedBonusCount: unresolvedBonuses.length
+  };
+}
