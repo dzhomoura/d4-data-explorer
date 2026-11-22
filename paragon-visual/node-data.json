@@ -7,159 +7,6 @@
   },
   "nodes": [
     {
-      "name": "Generic_Gate",
-      "snoId": 994337,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Gate.pgn.json",
-      "kind": "gate",
-      "rarityOverride": 0,
-      "attributes": [
-        {
-          "name": "Strength_Core",
-          "id": 9,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        },
-        {
-          "name": "Intelligence_Core",
-          "id": 10,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        },
-        {
-          "name": "Willpower_Core",
-          "id": 11,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        },
-        {
-          "name": "Dexterity_Core",
-          "id": 12,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": true
-    },
-    {
-      "name": "Generic_Normal_Int",
-      "snoId": 678776,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Normal_Int.pgn.json",
-      "kind": "normal",
-      "rarityOverride": 0,
-      "attributes": [
-        {
-          "name": "Intelligence_Core",
-          "id": 10,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Normal_Str",
-      "snoId": 678769,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Normal_Str.pgn.json",
-      "kind": "normal",
-      "rarityOverride": 0,
-      "attributes": [
-        {
-          "name": "Strength_Core",
-          "id": 9,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Normal_Dex",
-      "snoId": 678775,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Normal_Dex.pgn.json",
-      "kind": "normal",
-      "rarityOverride": 0,
-      "attributes": [
-        {
-          "name": "Dexterity_Core",
-          "id": 12,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Normal_Will",
-      "snoId": 678773,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Normal_Will.pgn.json",
-      "kind": "normal",
-      "rarityOverride": 0,
-      "attributes": [
-        {
-          "name": "Willpower_Core",
-          "id": 11,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Normal",
-          "formulaValue": 5,
-          "verifiedBonus": 5
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Magic_Will",
-      "snoId": 678629,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_Will.pgn.json",
-      "kind": "magic",
-      "rarityOverride": 2,
-      "attributes": [
-        {
-          "name": "Willpower_Core",
-          "id": 11,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Magic",
-          "formulaValue": 7,
-          "verifiedBonus": 7
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
       "name": "Generic_Magic_DamageToElite",
       "snoId": 678842,
       "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_DamageToElite.pgn.json",
@@ -174,27 +21,6 @@
           "formulaReference": "ParagonNodeDamageBonusToElite_Magic",
           "formulaValue": null,
           "verifiedBonus": null
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Magic_Int",
-      "snoId": 678627,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_Int.pgn.json",
-      "kind": "magic",
-      "rarityOverride": 2,
-      "attributes": [
-        {
-          "name": "Intelligence_Core",
-          "id": 10,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeCoreStat_Magic",
-          "formulaValue": 7,
-          "verifiedBonus": 7
         }
       ],
       "thresholdReferences": [],
@@ -272,27 +98,6 @@
       "isGate": false
     },
     {
-      "name": "Generic_Magic_Damage",
-      "snoId": 678754,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_Damage.pgn.json",
-      "kind": "magic",
-      "rarityOverride": 2,
-      "attributes": [
-        {
-          "name": "Damage_Percent_All_From_Skills",
-          "id": 252,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeDamageBonus_Magic",
-          "formulaValue": null,
-          "verifiedBonus": null
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
       "name": "Generic_Socket",
       "snoId": 681756,
       "sourcePath": "json/base/meta/ParagonNode/Generic_Socket.pgn.json",
@@ -301,48 +106,6 @@
       "attributes": [],
       "thresholdReferences": [],
       "hasSocket": true,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Magic_HPPercent",
-      "snoId": 679184,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_HPPercent.pgn.json",
-      "kind": "magic",
-      "rarityOverride": 2,
-      "attributes": [
-        {
-          "name": "Hitpoints_Max_Percent_Bonus",
-          "id": 142,
-          "param": -1,
-          "literalFormula": "0",
-          "formulaReference": "ParagonNodeHPMaxBonus_Magic",
-          "formulaValue": null,
-          "verifiedBonus": null
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
-      "isGate": false
-    },
-    {
-      "name": "Generic_Magic_Armor",
-      "snoId": 671247,
-      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_Armor.pgn.json",
-      "kind": "magic",
-      "rarityOverride": 2,
-      "attributes": [
-        {
-          "name": "Armor_Percent",
-          "id": 482,
-          "param": -1,
-          "literalFormula": "",
-          "formulaReference": "ParagonNodeArmorBonus_Magic",
-          "formulaValue": null,
-          "verifiedBonus": null
-        }
-      ],
-      "thresholdReferences": [],
-      "hasSocket": false,
       "isGate": false
     },
     {

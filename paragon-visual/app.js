@@ -1,4 +1,5 @@
 import { calculateParagonBonuses } from "./paragon-calculator.js";
+import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
 
 (() => {
   "use strict";
@@ -22,7 +23,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       calculationScope: "Board 00 uses its board-scoped verified bonus registry and pinned core-stat formulas."
     }),
     board01: Object.freeze({
-      label: "Board 01 — Additional Paladin Board",
+      label: "Board 01 — Castle",
       boardUrl: "../paladin-board-01.json",
       nodeDatabaseUrl: "node-data-01.json",
       storageKey: "d4-paragon-paladin-01-v1",
@@ -30,6 +31,16 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       requiresEntryGate: true,
       supportsBuildFiles: false,
       calculationScope: "Board 01 includes Castle bonuses and conditional thresholds observed unamplified at equip index 1. Other equip positions and the legendary power remain unresolved."
+    }),
+    board02: Object.freeze({
+      label: "Board 02 — Shield Bearer",
+      boardUrl: "../paladin-board-02.json",
+      nodeDatabaseUrl: "node-data-02.json",
+      storageKey: "d4-paragon-paladin-02-v1",
+      boardEquipIndex: 2,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      calculationScope: "Board 02 resolves shared Normal/Gate +5 core attributes; selected shared Magic bonuses including +100 flat Thorns; direct Stalwart, Growth, and Constrict bonuses; base-only Knight bonuses; and planner-observed Bludgeoning/Bodyguard base and threshold bonuses. Remaining Magic effects, thresholds, and the legendary power remain unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -115,8 +126,15 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       unconditional: document.getElementById("raw-block-damage-base"),
       conditional: document.getElementById("raw-block-damage-conditional"),
       total: document.getElementById("raw-block-damage-total")
+    },
+    thorns: {
+      unconditional: document.getElementById("raw-thorns-base"),
+      conditional: document.getElementById("raw-thorns-conditional"),
+      total: document.getElementById("raw-thorns-total")
     }
   };
+  const statsSidebarList = document.getElementById("stats-sidebar-list");
+  const statsSidebarEmpty = document.getElementById("stats-sidebar-empty");
   const saveStatus = document.getElementById("save-status");
   const allocationResetButton = document.getElementById("allocation-reset");
   const exportBuildButton = document.getElementById("export-build");
@@ -141,8 +159,27 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     Damage_Percent_Bonus_Vs_CC_All: "Damage to Crowd Controlled",
     Resistance_All_Bonus_Percent: "Resistance to All Elements",
     Block_Chance: "Block Chance",
-    Block_Damage_Percent_Bonus: "Blocked Damage Reduction"
+    Block_Damage_Percent_Bonus: "Blocked Damage Reduction",
+    Thorns_Flat: "Thorns"
   };
+  const CORE_ATTRIBUTE_NAMES = Object.freeze({
+    Strength_Core: "Strength",
+    Intelligence_Core: "Intelligence",
+    Willpower_Core: "Willpower",
+    Dexterity_Core: "Dexterity"
+  });
+  const RAW_BONUS_LABELS = Object.freeze({
+    damage: "Damage",
+    damageToElites: "Damage to Elites",
+    physicalDamage: "Physical Damage",
+    damageToCrowdControlled: "Damage to Crowd Controlled",
+    maximumLifePercent: "Maximum Life",
+    totalArmorPercent: "Total Armor",
+    allResistance: "Resistance to All Elements",
+    blockChance: "Block Chance",
+    blockedDamageReduction: "Blocked Damage Reduction",
+    thorns: "Thorns"
+  });
   const KIND_LABELS = {
     normal: "Normal",
     magic: "Magic",
@@ -170,6 +207,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   let currentNodeDatabase = null;
   let externalAttributes = { Strength: 0, Intelligence: 0, Willpower: 0, Dexterity: 0 };
   let currentCalculation = null;
+  let statContributors = new Map();
   let currentBoardKey = "board00";
   let currentBoardConfig = BOARD_CONFIGS.board00;
   const boardResources = new Map();
@@ -211,7 +249,7 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
 
   function formatBonusValue(value, category) {
     const sign = value > 0 ? "+" : "";
-    if (category === "coreAttribute") return `${sign}${value}`;
+    if (category === "coreAttribute" || category === "thorns") return `${sign}${value}`;
     return `${sign}${Number.isInteger(value) ? value : Number(value.toFixed(2))}%`;
   }
 
@@ -266,7 +304,8 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
               totalArmorPercent: "Total Armor",
               allResistance: "Resistance to All Elements",
               blockChance: "Block Chance",
-              blockedDamageReduction: "Blocked Damage Reduction"
+              blockedDamageReduction: "Blocked Damage Reduction",
+              thorns: "Thorns"
             }[calculation.category];
           const basePrefix = calculation.provenance === "verified-game-formula"
             ? "Verified bonus"
@@ -991,10 +1030,12 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     const categories = result.verifiedParagonBonuses.rawBonuses;
     for (const [category, totals] of Object.entries(categories)) {
       const displays = rawBonusDisplays[category];
-      displays.unconditional.textContent = formatPercentValue(totals.unconditional);
-      displays.conditional.textContent = formatPercentValue(totals.conditional);
-      displays.total.textContent = formatPercentValue(totals.total);
+      if (!displays) continue;
+      displays.unconditional.textContent = formatRawBonusValue(totals.unconditional, category);
+      displays.conditional.textContent = formatRawBonusValue(totals.conditional, category);
+      displays.total.textContent = formatRawBonusValue(totals.total, category);
     }
+    renderStatsSidebar(result);
 
     if (activeTooltipMarker) {
       const node = boardNodes.get(Number(activeTooltipMarker.dataset.nodeIndex));
@@ -1005,6 +1046,89 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
   function formatPercentValue(value) {
     const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
     return `${value >= 0 ? "+" : ""}${rounded}%`;
+  }
+
+  function formatRawBonusValue(value, category) {
+    if (category === "thorns") {
+      const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+      return `${value >= 0 ? "+" : ""}${rounded}`;
+    }
+    return formatPercentValue(value);
+  }
+
+  function clearStatHighlights() {
+    for (const node of boardNodes.values()) {
+      node.marker?.classList.remove("node--stat-highlight", "node--stat-highlight-conditional");
+    }
+  }
+
+  function highlightStatContributors(key) {
+    clearStatHighlights();
+    for (const contributor of statContributors.get(key) || []) {
+      const marker = boardNodes.get(contributor.nodeIndex)?.marker;
+      if (!marker) continue;
+      marker.classList.add("node--stat-highlight");
+      marker.classList.toggle("node--stat-highlight-conditional", contributor.conditional);
+    }
+  }
+
+  function addStatContribution(contributors, key, nodeIndex, conditional) {
+    if (!contributors.has(key)) contributors.set(key, new Map());
+    const nodeContribution = contributors.get(key);
+    const existing = nodeContribution.get(nodeIndex);
+    nodeContribution.set(nodeIndex, { nodeIndex, conditional: Boolean(existing?.conditional || conditional) });
+  }
+
+  function renderStatsSidebar(result) {
+    const contributors = new Map();
+    for (const node of result.nodeEvaluations) {
+      if (!node.allocated) continue;
+      for (const attribute of node.attributes) {
+        const key = attribute.category === "coreAttribute"
+          ? `core:${CORE_ATTRIBUTE_NAMES[attribute.attributeName] || attribute.attributeName}`
+          : attribute.category ? `raw:${attribute.category}` : null;
+        if (!key) continue;
+        if (Number.isFinite(attribute.unconditional) && attribute.unconditional !== 0) {
+          addStatContribution(contributors, key, node.nodeIndex, false);
+        }
+        if (attribute.conditional > 0 && attribute.conditionalApplied) {
+          addStatContribution(contributors, key, node.nodeIndex, true);
+        }
+      }
+    }
+    statContributors = new Map([...contributors].map(([key, nodes]) => [key, [...nodes.values()]]));
+    clearStatHighlights();
+
+    const entries = [];
+    for (const [attributeName, amount] of Object.entries(result.verifiedParagonBonuses.coreAttributes)) {
+      if (amount !== 0) entries.push({ key: `core:${attributeName}`, label: attributeName, value: amount, flat: true });
+    }
+    for (const [category, totals] of Object.entries(result.verifiedParagonBonuses.rawBonuses)) {
+      if (totals.total !== 0) {
+        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || category, value: totals.total, flat: category === "thorns" });
+      }
+    }
+    statsSidebarList.replaceChildren();
+    for (const entry of entries) {
+      const item = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "stats-sidebar-item";
+      button.dataset.statKey = entry.key;
+      button.setAttribute("aria-label", `${entry.value >= 0 ? "+" : ""}${entry.value}${entry.flat ? "" : "%"} ${entry.label}; highlight contributing nodes`);
+      const label = document.createElement("span");
+      label.textContent = entry.label;
+      const value = document.createElement("strong");
+      value.textContent = `${entry.value >= 0 ? "+" : ""}${Number.isInteger(entry.value) ? entry.value : Number(entry.value.toFixed(2))}${entry.flat ? "" : "%"}`;
+      button.append(label, value);
+      button.addEventListener("pointerenter", () => highlightStatContributors(entry.key));
+      button.addEventListener("pointerleave", clearStatHighlights);
+      button.addEventListener("focus", () => highlightStatContributors(entry.key));
+      button.addEventListener("blur", clearStatHighlights);
+      item.appendChild(button);
+      statsSidebarList.appendChild(item);
+    }
+    statsSidebarEmpty.hidden = entries.length !== 0;
   }
 
   function allocateNode(id) {
@@ -1151,7 +1275,8 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
     ]);
     if (!boardResponse.ok) throw new Error(`${config.label} request failed (${boardResponse.status}).`);
     if (!databaseResponse.ok) throw new Error(`${config.label} node database request failed (${databaseResponse.status}).`);
-    const [board, database] = await Promise.all([boardResponse.json(), databaseResponse.json()]);
+    const [board, boardDatabase] = await Promise.all([boardResponse.json(), databaseResponse.json()]);
+    const database = mergeSharedNodeDefinitions(boardDatabase);
     return { board, database };
   }
 
@@ -1172,8 +1297,18 @@ import { calculateParagonBonuses } from "./paragon-calculator.js";
       const board01Option = boardSelector.querySelector('option[value="board01"]');
       if (board01Option) board01Option.disabled = false;
     } catch (error) {
-      console.error("Could not load the additional Paladin board:", error);
+      console.error("Could not load the Castle board:", error);
       setAllocationMessage(`Board 00 is available, but Board 01 could not be loaded. (${error.message})`, true);
+    }
+
+    try {
+      const board02 = await loadBoardResource("board02");
+      boardResources.set("board02", board02);
+      const board02Option = boardSelector.querySelector('option[value="board02"]');
+      if (board02Option) board02Option.disabled = false;
+    } catch (error) {
+      console.error("Could not load Paladin Board 02:", error);
+      setAllocationMessage(`Board 02 could not be loaded. (${error.message})`, true);
     }
   })();
 })();

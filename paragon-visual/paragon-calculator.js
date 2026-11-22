@@ -1,4 +1,4 @@
-import { CASTLE_BONUS_REGISTRY, PARAGON_BONUS_REGISTRY } from "./paragon-bonus-registry.js";
+import { CASTLE_BONUS_REGISTRY, PARAGON_BONUS_REGISTRY, SHIELD_BEARER_BONUS_REGISTRY } from "./paragon-bonus-registry.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -26,11 +26,13 @@ const BONUS_CATEGORIES = Object.freeze([
   "totalArmorPercent",
   "allResistance",
   "blockChance",
-  "blockedDamageReduction"
+  "blockedDamageReduction",
+  "thorns"
 ]);
 const BOARD_BONUS_REGISTRIES = Object.freeze({
   [PARAGON_BONUS_REGISTRY.boardSnoId]: PARAGON_BONUS_REGISTRY,
-  [CASTLE_BONUS_REGISTRY.boardSnoId]: CASTLE_BONUS_REGISTRY
+  [CASTLE_BONUS_REGISTRY.boardSnoId]: CASTLE_BONUS_REGISTRY,
+  [SHIELD_BEARER_BONUS_REGISTRY.boardSnoId]: SHIELD_BEARER_BONUS_REGISTRY
 });
 const ZERO_EXTERNAL_ATTRIBUTES = Object.freeze({
   Strength: 0,
@@ -65,7 +67,30 @@ function createBonusTotals() {
 function getRegistryNode(definition, boardRegistry) {
   if (!boardRegistry) return null;
   const record = boardRegistry.nodes[String(definition.snoId)];
-  return record && record.name === definition.name ? record : null;
+  if (record && record.name === definition.name) return record;
+
+  for (const reuse of boardRegistry.reuseNodeRecords || []) {
+    if (!Number.isSafeInteger(reuse?.sourceBoardSnoId)
+      || !Array.isArray(reuse.nodeSnoIds)
+      || !reuse.nodeSnoIds.includes(definition.snoId)) {
+      continue;
+    }
+    const sourceRegistry = BOARD_BONUS_REGISTRIES[reuse.sourceBoardSnoId];
+    if (!sourceRegistry || sourceRegistry.sourceRevision !== boardRegistry.sourceRevision) continue;
+    const sourceRecord = sourceRegistry.nodes[String(definition.snoId)];
+    if (sourceRecord?.name === definition.name && sourceRecord.sourcePath === definition.sourcePath) {
+      if (!reuse.baseOnly) return sourceRecord;
+      return {
+        ...sourceRecord,
+        attributes: sourceRecord.attributes.map((attribute) => ({
+          ...attribute,
+          conditional: 0,
+          thresholdReference: null
+        }))
+      };
+    }
+  }
+  return null;
 }
 
 function getRegisteredAttribute(nodeRecord, attribute, attributeIndex) {

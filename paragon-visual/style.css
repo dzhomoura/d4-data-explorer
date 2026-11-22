@@ -180,6 +180,147 @@ button:disabled {
   font: 11px/1.45 Arial, sans-serif;
 }
 
+.external-attribute-panel {
+  padding: 13px 18px 14px;
+  border-bottom: 1px solid #332a1f;
+  background: linear-gradient(90deg, rgba(18, 18, 17, 0.98), rgba(25, 22, 18, 0.98) 50%, rgba(17, 17, 16, 0.98));
+}
+
+.external-attribute-panel .external-attribute-section,
+.threshold-attribute-section {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.external-attribute-section h2,
+.threshold-attribute-section h3 {
+  margin: 0;
+  color: #e8dfcb;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+.threshold-attribute-section {
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(163, 128, 71, 0.25);
+}
+
+.threshold-attribute-section > p {
+  margin: 4px 0 8px;
+  color: #827a6d;
+  font: 10px/1.45 Arial, sans-serif;
+}
+
+.board-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 260px);
+  align-items: stretch;
+}
+
+.board-column {
+  min-width: 0;
+}
+
+.stats-sidebar {
+  padding: 12px;
+  border-left: 1px solid #332a1f;
+  background: linear-gradient(180deg, rgba(25, 22, 18, 0.98), rgba(13, 13, 13, 0.98));
+}
+
+.stats-sidebar details,
+.advanced-details {
+  border: 1px solid rgba(130, 105, 66, 0.38);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.stats-sidebar summary,
+.advanced-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  color: #e4d7b6;
+  cursor: pointer;
+  font: 12px Arial, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.stats-sidebar summary::marker,
+.advanced-details > summary::marker {
+  color: #b99055;
+}
+
+.stats-sidebar-summary,
+.advanced-details > summary span {
+  color: #9c907c;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.stats-sidebar-note,
+.stats-sidebar-empty {
+  margin: 0;
+  padding: 0 10px 10px;
+  color: #8f8777;
+  font: 10px/1.45 Arial, sans-serif;
+}
+
+.stats-sidebar-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 7px 10px;
+  list-style: none;
+}
+
+.stats-sidebar-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.16);
+  color: #c8bc9e;
+  cursor: pointer;
+  font: 12px Arial, sans-serif;
+  text-align: left;
+}
+
+.stats-sidebar-item:hover,
+.stats-sidebar-item:focus-visible {
+  border-color: rgba(215, 170, 91, 0.65);
+  background: rgba(124, 87, 36, 0.19);
+  outline: none;
+}
+
+.stats-sidebar-item strong {
+  flex: 0 0 auto;
+  color: #efd18a;
+  font-weight: 400;
+}
+
+.advanced-details {
+  margin-top: 0;
+  border-width: 1px 0 0;
+}
+
+.advanced-details[open] > summary {
+  border-bottom: 1px solid rgba(130, 105, 66, 0.38);
+}
+
+.advanced-details__content {
+  background: rgba(10, 10, 10, 0.4);
+}
+
 .allocation-message {
   color: #d3bd91;
 }
@@ -694,6 +835,25 @@ button:disabled {
   opacity: 0.75;
 }
 
+.node--stat-highlight {
+  z-index: 3;
+  outline: 2px solid #f5dc94;
+  outline-offset: 4px;
+  filter: brightness(1.45) saturate(1.2);
+  box-shadow:
+    inset 0 0 5px #250904,
+    0 0 8px rgba(240, 78, 57, 0.95),
+    0 0 20px rgba(245, 220, 148, 0.85);
+}
+
+.node--stat-highlight-conditional {
+  outline-color: #a9d87d;
+  box-shadow:
+    inset 0 0 5px #250904,
+    0 0 8px rgba(240, 78, 57, 0.95),
+    0 0 22px rgba(169, 216, 125, 0.95);
+}
+
 .node--unknown {
   color: #d5d0c3;
 }
@@ -937,6 +1097,21 @@ button:disabled {
   font: 10px/1.5 Arial, sans-serif;
 }
 
+@media (max-width: 850px) {
+  .board-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-sidebar {
+    border-top: 1px solid #332a1f;
+    border-left: 0;
+  }
+
+  .stats-sidebar-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 600px) {
   .app-shell {
     padding-top: 18px;
@@ -986,6 +1161,10 @@ button:disabled {
 
   .raw-bonus-totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-sidebar-list {
+    grid-template-columns: 1fr;
   }
 
   .attribute-total {

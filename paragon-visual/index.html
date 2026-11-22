@@ -18,7 +18,8 @@
             Board
             <select id="board-selector">
               <option value="board00">Board 00 — Starting Board</option>
-              <option value="board01" disabled>Board 01 — Additional Paladin Board</option>
+              <option value="board01" disabled>Board 01 — Castle</option>
+              <option value="board02" disabled>Board 02 — Shield Bearer</option>
             </select>
           </label>
         </div>
@@ -61,6 +62,53 @@
           <p class="allocation-cost-note">Provisional costs: starting node 0; every other node, including gates and sockets, 1 point.</p>
         </section>
 
+        <section class="external-attribute-panel" aria-labelledby="external-attribute-title">
+          <div class="external-attribute-section">
+            <h2 id="external-attribute-title">External attributes</h2>
+            <p>Enter attributes from sources outside this board. These inputs are saved locally and are not included in Paragon bonus totals or build exports.</p>
+            <div class="external-attribute-inputs">
+              <label>Strength <input id="external-strength" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+              <label>Intelligence <input id="external-intelligence" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+              <label>Willpower <input id="external-willpower" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+              <label>Dexterity <input id="external-dexterity" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+            </div>
+            <p id="external-save-status" class="external-save-status" role="status" aria-live="polite">Using default external attributes.</p>
+          </div>
+        </section>
+
+        <div class="board-workspace">
+          <div class="board-column">
+            <div id="board-stage" class="board-stage" tabindex="0" aria-label="Board canvas; drag to pan and use the mouse wheel to zoom">
+              <div id="board-frame" class="board-frame"></div>
+              <div id="node-tooltip" class="node-tooltip" role="tooltip" aria-hidden="true" hidden></div>
+            </div>
+            <footer class="board-footer">
+              <div id="legend" class="legend" aria-label="Node color legend">
+                <span class="legend-item"><i class="swatch swatch--normal"></i>Normal</span>
+                <span class="legend-item"><i class="swatch swatch--magic"></i>Magic</span>
+                <span class="legend-item"><i class="swatch swatch--rare"></i>Rare</span>
+                <span class="legend-item"><i class="swatch swatch--legendary"></i>Legendary</span>
+                <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
+                <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
+                <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>
+              </div>
+              <p class="connection-note">Only orthogonally adjacent occupied nodes connect. Allocated paths are highlighted in red.</p>
+            </footer>
+          </div>
+
+          <aside class="stats-sidebar" aria-label="Allocated Paragon bonus summary">
+            <details id="stats-sidebar-details" open>
+              <summary><span>Total stats</span><span class="stats-sidebar-summary">Paragon only</span></summary>
+              <p class="stats-sidebar-note">Hover a bonus to highlight its allocated contributing nodes.</p>
+              <ul id="stats-sidebar-list" class="stats-sidebar-list" aria-live="polite"></ul>
+              <p id="stats-sidebar-empty" class="stats-sidebar-empty">Allocate verified bonus nodes to see totals.</p>
+            </details>
+          </aside>
+        </div>
+
+        <details class="advanced-details">
+          <summary>Advanced Calculation Details <span>Verified breakdowns and diagnostics</span></summary>
+          <div class="advanced-details__content">
         <section class="attribute-panel" aria-labelledby="attribute-panel-title">
           <div class="attribute-panel-heading">
             <div>
@@ -77,16 +125,9 @@
             <div><dt>Dexterity gained</dt><dd id="paragon-dexterity">+0</dd></div>
             <div class="attribute-total"><dt>Total verified core attributes</dt><dd id="paragon-core-total">+0</dd></div>
           </dl>
-          <div class="external-attribute-section">
-            <h3>External attributes</h3>
-            <p>Enter attributes from sources outside this board. These inputs are saved locally and are not included in build exports.</p>
-            <div class="external-attribute-inputs">
-              <label>Strength <input id="external-strength" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
-              <label>Intelligence <input id="external-intelligence" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
-              <label>Willpower <input id="external-willpower" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
-              <label>Dexterity <input id="external-dexterity" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
-            </div>
-            <p id="external-save-status" class="external-save-status" role="status" aria-live="polite">Using default external attributes.</p>
+          <div class="threshold-attribute-section">
+            <h3>Total attributes used for thresholds</h3>
+            <p>External attributes plus verified gains from allocated Paragon nodes.</p>
             <dl class="total-attribute-totals">
               <div><dt>Total Strength</dt><dd id="total-strength">0</dd></div>
               <div><dt>Total Intelligence</dt><dd id="total-intelligence">0</dd></div>
@@ -140,25 +181,14 @@
               <h3>Blocked Damage Reduction</h3>
               <dl><div><dt>Base</dt><dd id="raw-block-damage-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-block-damage-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-block-damage-total">+0%</dd></div></dl>
             </article>
+            <article>
+              <h3>Thorns</h3>
+              <dl><div><dt>Base</dt><dd id="raw-thorns-base">+0</dd></div><div><dt>Conditional</dt><dd id="raw-thorns-conditional">+0</dd></div><div><dt>Total</dt><dd id="raw-thorns-total">+0</dd></div></dl>
+            </article>
           </div>
         </section>
-
-        <div id="board-stage" class="board-stage" tabindex="0" aria-label="Board canvas; drag to pan and use the mouse wheel to zoom">
-          <div id="board-frame" class="board-frame"></div>
-          <div id="node-tooltip" class="node-tooltip" role="tooltip" aria-hidden="true" hidden></div>
-        </div>
-        <footer class="board-footer">
-          <div id="legend" class="legend" aria-label="Node color legend">
-            <span class="legend-item"><i class="swatch swatch--normal"></i>Normal</span>
-            <span class="legend-item"><i class="swatch swatch--magic"></i>Magic</span>
-            <span class="legend-item"><i class="swatch swatch--rare"></i>Rare</span>
-            <span class="legend-item"><i class="swatch swatch--legendary"></i>Legendary</span>
-            <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
-            <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
-            <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>
           </div>
-          <p class="connection-note">Only orthogonally adjacent occupied nodes connect. Allocated paths are highlighted in red.</p>
-        </footer>
+        </details>
       </section>
     </main>
   </body>

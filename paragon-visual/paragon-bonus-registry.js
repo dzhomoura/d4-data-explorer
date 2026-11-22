@@ -420,3 +420,135 @@ export const CASTLE_BONUS_REGISTRY = {
     }
   }
 };
+
+// These records reuse only direct Board 00 observations for identical source
+// node identities on Shield Bearer. They deliberately do not establish a
+// formula-wide Damage or Maximum Life rule.
+export const SHIELD_BEARER_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2436844,
+  observedBoardEquipIndex: 2,
+  thresholds: {
+    StrengthMain2: {
+      snoId: 1015344,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1215,
+      observedBoardEquipIndex: 2,
+      provenance: DIRECT_IN_GAME
+    },
+    WillPowerSide3: {
+      snoId: 1015322,
+      requiredAttribute: "Willpower",
+      requiredAttributeId: 20,
+      requiredValue: 305,
+      observedBoardEquipIndex: 2,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain3: {
+      snoId: 1015346,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1345,
+      observedBoardEquipIndex: 2,
+      provenance: UNAMPLIFIED_PLANNER
+    },
+    "Paladin_Strength+Intelligence": {
+      snoId: 2504903,
+      combination: "all",
+      requirements: [
+        { requiredAttribute: "Strength", requiredAttributeId: 18, requiredValue: 1155 },
+        { requiredAttribute: "Intelligence", requiredAttributeId: 19, requiredValue: 260 }
+      ],
+      observedBoardEquipIndex: 2,
+      provenance: UNAMPLIFIED_PLANNER
+    }
+  },
+  reuseNodeRecords: [
+    {
+      sourceBoardSnoId: 2436511,
+      nodeSnoIds: [2063114, 678822, 678792]
+    },
+    {
+      sourceBoardSnoId: 2436511,
+      nodeSnoIds: [2449723],
+      baseOnly: true
+    }
+  ],
+  nodes: {
+    "2066535": {
+      name: "Generic_Magic_Thorns",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_Thorns.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 373, attributeName: "Thorns_Flat", formulaReference: "ParagonNodeThorns_Magic", category: "thorns", base: 100, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449719": {
+      name: "Paladin_Rare_008",
+      displayName: "Stalwart",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_008.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 331, attributeName: "Block_Chance", formulaReference: "ParagonNodeBlockChance_RareMinor", category: "blockChance", base: 2.5, conditional: 2.5, thresholdReference: "WillPowerSide3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 335, attributeName: "Block_Damage_Percent_Bonus", formulaReference: "ParagonNodeDamageBonusDot_RareMajor", category: "blockedDamageReduction", base: 15, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449751": {
+      name: "Paladin_Rare_011",
+      displayName: "Growth",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_011.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 373, attributeName: "Thorns_Flat", formulaReference: "ParagonNodeThorns_RareMajor", category: "thorns", base: 150, conditional: 150, thresholdReference: "StrengthMain2", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", formulaReference: "ParagonNodeHPMaxBonus_RareMinor", category: "maximumLifePercent", base: 4, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449755": {
+      name: "Paladin_Rare_013",
+      displayName: "Constrict",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_013.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 373, attributeName: "Thorns_Flat", formulaReference: "ParagonNodeThorns_RareMajor", category: "thorns", base: 150, conditional: 150, thresholdReference: "WillPowerSide3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "678754": {
+      name: "Generic_Magic_Damage",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_Damage.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 252, attributeName: "Damage_Percent_All_From_Skills", formulaReference: "ParagonNodeDamageBonus_Magic", category: "damage", base: 5, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679184": {
+      name: "Generic_Magic_HPPercent",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_HPPercent.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", formulaReference: "ParagonNodeHPMaxBonus_Magic", category: "maximumLifePercent", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449753": {
+      name: "Paladin_Rare_012",
+      displayName: "Bludgeoning",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_012.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 252, attributeName: "Damage_Percent_All_From_Skills", formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "damage", base: 10, conditional: 10, thresholdReference: "StrengthMain3", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 959, attributeName: "Damage_Percent_Bonus_Vs_CC_All", formulaReference: "ParagonNodeCritDamageToCC_RareMinor", category: "damageToCrowdControlled", base: 10, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449759": {
+      name: "Paladin_Rare_015",
+      displayName: "Bodyguard",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_015.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Intelligence", provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 331, attributeName: "Block_Chance", formulaReference: "ParagonNodeBlockChance_RareMinor", category: "blockChance", base: 2.5, conditional: 0, thresholdReference: null, provenance: UNAMPLIFIED_PLANNER, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    }
+  }
+};
