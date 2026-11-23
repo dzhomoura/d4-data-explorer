@@ -1,0 +1,385 @@
+{
+  "source": {
+    "repository": "DiabloTools/d4data",
+    "commit": "75e619f0d90a0951945747f45feef59c076a5db0",
+    "boardSnoId": 2438992,
+    "boardDisplayName": "Divinity",
+    "formulaSourcePath": "json/base/meta/GameBalance/AttributeFormulas.gam.json"
+  },
+  "nodes": [
+    {
+      "name": "Paladin_Legendary_005",
+      "displayName": null,
+      "snoId": 2438120,
+      "sourcePath": "json/base/meta/ParagonNode/Paladin_Legendary_005.pgn.json",
+      "kind": "legendary",
+      "rarityOverride": 4,
+      "attributes": [],
+      "ptBonusAttributeIndices": [],
+      "thresholdReferences": [],
+      "passivePower": {
+        "name": "Paragon_Paladin_Legendary_005",
+        "snoId": 2493403,
+        "target": "base/meta/Power/Paragon_Paladin_Legendary_005.pow"
+      },
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Magic_ArmorPercent",
+      "displayName": null,
+      "snoId": 2127186,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_ArmorPercent.pgn.json",
+      "kind": "magic",
+      "rarityOverride": 2,
+      "attributes": [
+        {
+          "name": "Armor_Percent",
+          "id": 482,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeArmorBonus_Magic",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [],
+      "thresholdReferences": [],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Paladin_Rare_054",
+      "displayName": "Sturdy",
+      "snoId": 2449942,
+      "sourcePath": "json/base/meta/ParagonNode/Paladin_Rare_054.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Armor_Percent",
+          "id": 482,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeArmorBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Hitpoints_Max_Percent_Bonus",
+          "id": 142,
+          "param": -1,
+          "literalFormula": "0.06",
+          "formulaReference": "ParagonNodeHPMaxBonus_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [
+        0
+      ],
+      "thresholdReferences": [
+        {
+          "name": "IntelligenceSide1",
+          "snoId": 1015350,
+          "target": "base/meta/ParagonThreshold/IntelligenceSide1.pth"
+        }
+      ],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Paladin_Rare_005",
+      "displayName": "Defiance",
+      "snoId": 2449713,
+      "sourcePath": "json/base/meta/ParagonNode/Paladin_Rare_005.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Armor_Percent",
+          "id": 482,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeArmorBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Resistance_All_Bonus_Percent",
+          "id": 79,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeResistAll_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [
+        0
+      ],
+      "thresholdReferences": [
+        {
+          "name": "StrengthMain3",
+          "snoId": 1015346,
+          "target": "base/meta/ParagonThreshold/StrengthMain3.pth"
+        }
+      ],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Magic_ResistanceAll",
+      "displayName": null,
+      "snoId": 678750,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_ResistanceAll.pgn.json",
+      "kind": "magic",
+      "rarityOverride": 2,
+      "attributes": [
+        {
+          "name": "Resistance_All_Bonus_Percent",
+          "id": 79,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeResistAll_Magic",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [],
+      "thresholdReferences": [],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Magic_DamageToVulnerable",
+      "displayName": null,
+      "snoId": 678863,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_DamageToVulnerable.pgn.json",
+      "kind": "magic",
+      "rarityOverride": 2,
+      "attributes": [
+        {
+          "name": "Vulnerable_Health_Damage_Bonus",
+          "id": 736,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeDamageBonusToVulnerable_Magic",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [],
+      "thresholdReferences": [],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Magic_DamageReductionFromVulnerable",
+      "displayName": null,
+      "snoId": 691371,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_DamageReductionFromVulnerable.pgn.json",
+      "kind": "magic",
+      "rarityOverride": 2,
+      "attributes": [
+        {
+          "name": "Armor_Percent",
+          "id": 482,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeArmorBonus_Magic",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [],
+      "thresholdReferences": [],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Paladin_Rare_059",
+      "displayName": "Oppressive",
+      "snoId": 2504935,
+      "sourcePath": "json/base/meta/ParagonNode/Paladin_Rare_059.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Vulnerable_Health_Damage_Bonus",
+          "id": 736,
+          "param": -1,
+          "literalFormula": "0.05",
+          "formulaReference": "ParagonNodeDamageBonusToVulnerable_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Armor_Percent",
+          "id": 482,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeArmorBonus_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [
+        0
+      ],
+      "thresholdReferences": [
+        {
+          "name": "IntelligenceSide2",
+          "snoId": 1015351,
+          "target": "base/meta/ParagonThreshold/IntelligenceSide2.pth"
+        }
+      ],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Paladin_Rare_033",
+      "displayName": "Cautious Fighter",
+      "snoId": 2449796,
+      "sourcePath": "json/base/meta/ParagonNode/Paladin_Rare_033.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Damage_Percent_All_From_Skills",
+          "id": 252,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeDamageBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Resistance_All_Bonus_Percent",
+          "id": 79,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeResistAll_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [
+        0
+      ],
+      "thresholdReferences": [
+        {
+          "name": "StrengthMain1",
+          "snoId": 1015345,
+          "target": "base/meta/ParagonThreshold/StrengthMain1.pth"
+        }
+      ],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Barbarian_Rare_004",
+      "displayName": "Flayer",
+      "snoId": 671197,
+      "sourcePath": "json/base/meta/ParagonNode/Barbarian_Rare_004.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Vulnerable_Health_Damage_Bonus",
+          "id": 736,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeDamageBonusToVulnerable_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Strength_Core",
+          "id": 9,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeCoreStat_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [
+        0
+      ],
+      "thresholdReferences": [
+        {
+          "name": "WillPowerSide2",
+          "snoId": 1015277,
+          "target": "base/meta/ParagonThreshold/WillPowerSide2.pth"
+        }
+      ],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Socket",
+      "displayName": null,
+      "snoId": 681756,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Socket.pgn.json",
+      "kind": "socket",
+      "rarityOverride": 0,
+      "attributes": [],
+      "ptBonusAttributeIndices": [],
+      "thresholdReferences": [],
+      "passivePower": null,
+      "hasSocket": true,
+      "isGate": false
+    },
+    {
+      "name": "Paladin_Rare_053",
+      "displayName": "Champion",
+      "snoId": 2449940,
+      "sourcePath": "json/base/meta/ParagonNode/Paladin_Rare_053.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Damage_Percent_All_From_Skills",
+          "id": 252,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeDamageBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Strength_Core",
+          "id": 9,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeCoreStat_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "ptBonusAttributeIndices": [
+        0
+      ],
+      "thresholdReferences": [
+        {
+          "name": "WillPowerSide1",
+          "snoId": 1015310,
+          "target": "base/meta/ParagonThreshold/WillPowerSide1.pth"
+        }
+      ],
+      "passivePower": null,
+      "hasSocket": false,
+      "isGate": false
+    }
+  ]
+}

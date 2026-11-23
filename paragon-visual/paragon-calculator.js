@@ -1,4 +1,12 @@
-import { CASTLE_BONUS_REGISTRY, FERVENT_BONUS_REGISTRY, PARAGON_BONUS_REGISTRY, SHIELD_BEARER_BONUS_REGISTRY } from "./paragon-bonus-registry.js";
+import {
+  CASTLE_BONUS_REGISTRY,
+  DIVINITY_BONUS_REGISTRY,
+  FERVENT_BONUS_REGISTRY,
+  PARAGON_BONUS_REGISTRY,
+  PREACHER_BONUS_REGISTRY,
+  RELENTLESS_BONUS_REGISTRY,
+  SHIELD_BEARER_BONUS_REGISTRY
+} from "./paragon-bonus-registry.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -33,7 +41,10 @@ const BOARD_BONUS_REGISTRIES = Object.freeze({
   [PARAGON_BONUS_REGISTRY.boardSnoId]: PARAGON_BONUS_REGISTRY,
   [CASTLE_BONUS_REGISTRY.boardSnoId]: CASTLE_BONUS_REGISTRY,
   [SHIELD_BEARER_BONUS_REGISTRY.boardSnoId]: SHIELD_BEARER_BONUS_REGISTRY,
-  [FERVENT_BONUS_REGISTRY.boardSnoId]: FERVENT_BONUS_REGISTRY
+  [FERVENT_BONUS_REGISTRY.boardSnoId]: FERVENT_BONUS_REGISTRY,
+  [PREACHER_BONUS_REGISTRY.boardSnoId]: PREACHER_BONUS_REGISTRY,
+  [DIVINITY_BONUS_REGISTRY.boardSnoId]: DIVINITY_BONUS_REGISTRY,
+  [RELENTLESS_BONUS_REGISTRY.boardSnoId]: RELENTLESS_BONUS_REGISTRY
 });
 const ZERO_EXTERNAL_ATTRIBUTES = Object.freeze({
   Strength: 0,
@@ -83,11 +94,14 @@ function getRegistryNode(definition, boardRegistry) {
       if (!reuse.baseOnly) return sourceRecord;
       return {
         ...sourceRecord,
-        attributes: sourceRecord.attributes.map((attribute) => ({
-          ...attribute,
-          conditional: 0,
-          thresholdReference: null
-        }))
+        attributes: sourceRecord.attributes.map((attribute) => {
+          const thresholdReference = reuse.reportUnresolvedConditional ? attribute.thresholdReference : null;
+          return {
+            ...attribute,
+            conditional: thresholdReference ? null : 0,
+            thresholdReference
+          };
+        })
       };
     }
   }

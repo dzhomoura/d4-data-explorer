@@ -4,7 +4,10 @@ const BOARD_SNO_IDS = Object.freeze({
   board00: 2436481,
   board01: 2436511,
   board02: 2436844,
-  board03: 2438913
+  board03: 2438913,
+  board04: 2438973,
+  board05: 2438992,
+  board06: 2439024
 });
 const ALL_BOARD_SNO_IDS = Object.freeze(Object.values(BOARD_SNO_IDS));
 
@@ -16,10 +19,10 @@ export const SHARED_NODE_DEFINITIONS = Object.freeze([
   share(createGateNode(), ALL_BOARD_SNO_IDS),
   share(createMagicNode("Generic_Magic_Armor", 671247, "Armor_Percent", 482, -1, "", "ParagonNodeArmorBonus_Magic"), [BOARD_SNO_IDS.board00, BOARD_SNO_IDS.board01]),
   share(createMagicNode("Generic_Magic_BlockChance", 2063114, "Block_Chance", 331, -1, "0", "ParagonNodeBlockChance_Magic"), [BOARD_SNO_IDS.board01, BOARD_SNO_IDS.board02]),
-  share(createMagicNode("Generic_Magic_Damage", 678754, "Damage_Percent_All_From_Skills", 252, -1, "", "ParagonNodeDamageBonus_Magic"), [BOARD_SNO_IDS.board00, BOARD_SNO_IDS.board02]),
+  share(createMagicNode("Generic_Magic_Damage", 678754, "Damage_Percent_All_From_Skills", 252, -1, "", "ParagonNodeDamageBonus_Magic"), [BOARD_SNO_IDS.board00, BOARD_SNO_IDS.board02, BOARD_SNO_IDS.board05]),
   share(createMagicNode("Generic_Magic_DamagePhysical", 678822, "Damage_Type_Percent_Bonus", 254, 0, "", "ParagonNodeDamageBonus_Magic"), [BOARD_SNO_IDS.board01, BOARD_SNO_IDS.board02, BOARD_SNO_IDS.board03]),
   share(createMagicNode("Generic_Magic_DamageToCC", 678792, "Damage_Percent_Bonus_Vs_CC_All", 959, -1, "", "ParagonNodeDamageBonusToCC_Magic"), [BOARD_SNO_IDS.board01, BOARD_SNO_IDS.board02]),
-  share(createMagicNode("Generic_Magic_HPPercent", 679184, "Hitpoints_Max_Percent_Bonus", 142, -1, "0", "ParagonNodeHPMaxBonus_Magic"), ALL_BOARD_SNO_IDS),
+  share(createMagicNode("Generic_Magic_HPPercent", 679184, "Hitpoints_Max_Percent_Bonus", 142, -1, "0", "ParagonNodeHPMaxBonus_Magic"), [BOARD_SNO_IDS.board00, BOARD_SNO_IDS.board01, BOARD_SNO_IDS.board02, BOARD_SNO_IDS.board03, BOARD_SNO_IDS.board04, BOARD_SNO_IDS.board05]),
   share(createMagicNode("Generic_Magic_Int", 678627, "Intelligence_Core", 10, -1, "", "ParagonNodeCoreStat_Magic", 7), ALL_BOARD_SNO_IDS),
   share(createMagicNode("Generic_Magic_Will", 678629, "Willpower_Core", 11, -1, "", "ParagonNodeCoreStat_Magic", 7), ALL_BOARD_SNO_IDS)
 ]);

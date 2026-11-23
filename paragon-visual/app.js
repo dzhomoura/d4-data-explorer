@@ -51,6 +51,39 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       requiresEntryGate: true,
       supportsBuildFiles: false,
       calculationScope: "Fervent resolves ordinary node bonuses and all six observed Rare thresholds at equip index 3. The Legendary power remains unresolved."
+    }),
+    board04: Object.freeze({
+      label: "Board 04 — Preacher",
+      boardUrl: "../paladin-board-04.json",
+      nodeDatabaseUrl: "node-data-04.json",
+      storageKey: "d4-paragon-paladin-04-v1",
+      boardEquipIndex: 4,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      rareThresholdsUnverified: true,
+      calculationScope: "Preacher includes verified core stats, Magic Maximum Life, and Magic Resistance to All Elements. Other Magic, Rare, and Legendary effects remain unresolved."
+    }),
+    board05: Object.freeze({
+      label: "Board 05 — Divinity",
+      boardUrl: "../paladin-board-05.json",
+      nodeDatabaseUrl: "node-data-05.json",
+      storageKey: "d4-paragon-paladin-05-v1",
+      boardEquipIndex: 5,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      rareThresholdsUnverified: true,
+      calculationScope: "Divinity includes verified core stats, selected Magic bonuses, and the observed Sturdy and Defiance bases. Other Magic and Rare effects, all Rare thresholds, and the Legendary power remain unresolved."
+    }),
+    board06: Object.freeze({
+      label: "Board 06 — Relentless",
+      boardUrl: "../paladin-board-06.json",
+      nodeDatabaseUrl: "node-data-06.json",
+      storageKey: "d4-paragon-paladin-06-v1",
+      boardEquipIndex: 6,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      rareThresholdsUnverified: true,
+      calculationScope: "Relentless includes verified core stats, Magic Armor and Resistance to All Elements, and the observed Defiance base. Other Magic and Rare effects, all Rare thresholds, and the Legendary power remain unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -418,7 +451,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
           ? evaluation.requirements
             ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
             : `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
-          : evaluation
+          : evaluation || currentBoardConfig.rareThresholdsUnverified
             ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
             : `${threshold.name}: not evaluated`;
         const className = evaluation?.resolved
@@ -431,11 +464,13 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
         thresholds,
         "p",
         "tooltip-formula-note",
-        currentBoardKey === "board00"
-          ? "Only the in-game verified starting-board requirement is evaluated."
-          : currentBoardKey === "board03"
-            ? "Fervent thresholds use total attributes and the observed equip-index-3 requirements."
-            : "Castle thresholds are evaluated only for the observed equip-index-1 context."
+        currentBoardConfig.rareThresholdsUnverified
+          ? "Rare threshold requirements are unverified for this board."
+          : currentBoardKey === "board00"
+            ? "Only the in-game verified starting-board requirement is evaluated."
+            : currentBoardKey === "board03"
+              ? "Fervent thresholds use total attributes and the observed equip-index-3 requirements."
+              : "Castle thresholds are evaluated only for the observed equip-index-1 context."
       );
       tooltip.appendChild(thresholds);
     }
@@ -1357,6 +1392,19 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     } catch (error) {
       console.error("Could not load Paladin Board 03:", error);
       setAllocationMessage(`Board 03 could not be loaded. (${error.message})`, true);
+    }
+
+    for (const boardKey of ["board04", "board05", "board06"]) {
+      const { label } = BOARD_CONFIGS[boardKey];
+      try {
+        const resource = await loadBoardResource(boardKey);
+        boardResources.set(boardKey, resource);
+        const option = boardSelector.querySelector(`option[value="${boardKey}"]`);
+        if (option) option.disabled = false;
+      } catch (error) {
+        console.error(`Could not load ${label}:`, error);
+        setAllocationMessage(`${label} could not be loaded. (${error.message})`, true);
+      }
     }
   })();
 })();

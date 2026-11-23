@@ -688,3 +688,43 @@ export const FERVENT_BONUS_REGISTRY = {
     }
   }
 };
+
+// These contexts identify the viewer's separate board calculations.
+// Thresholds require evidence for the specific board and equip position.
+export const PREACHER_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2438973,
+  observedBoardEquipIndex: 4,
+  thresholds: {},
+  reuseNodeRecords: [
+    { sourceBoardSnoId: 2436481, nodeSnoIds: [679184] },
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [678750] }
+  ],
+  nodes: {}
+};
+
+export const DIVINITY_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2438992,
+  observedBoardEquipIndex: 5,
+  thresholds: {},
+  reuseNodeRecords: [
+    { sourceBoardSnoId: 2436481, nodeSnoIds: [678754, 679184] },
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2127186, 678750] },
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2449713], baseOnly: true, reportUnresolvedConditional: true },
+    { sourceBoardSnoId: 2438913, nodeSnoIds: [2449942], baseOnly: true, reportUnresolvedConditional: true }
+  ],
+  nodes: {}
+};
+
+export const RELENTLESS_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2439024,
+  observedBoardEquipIndex: 6,
+  thresholds: {},
+  reuseNodeRecords: [
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2127186, 678750] },
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2449713], baseOnly: true, reportUnresolvedConditional: true }
+  ],
+  nodes: {}
+};

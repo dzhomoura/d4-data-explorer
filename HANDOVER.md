@@ -8,10 +8,13 @@ This is a dependency-free browser viewer/calculator for Diablo IV Paladin Parago
 - **Board 01 — Castle** (SNO `2436511`), modeled as the first additional board (`ParagonBoardEquipIndex = 1`)
 - **Board 02 — Shield Bearer** (SNO `2436844`), with selected verified shared core-stat and Magic bonuses
 - **Board 03 — Fervent** (SNO `2438913`), with complete ordinary numerical bonuses at equip index 3
+- **Board 04 — Preacher** (SNO `2438973`)
+- **Board 05 — Divinity** (SNO `2438992`)
+- **Board 06 — Relentless** (SNO `2439024`)
 
 `paragon-visual/app.js` loads board/node JSON, merges revision-pinned definitions from `shared-node-definitions.js` according to board SNO, renders the 21×21 grid, manages zoom/pan/tooltips and allocation connectivity, persists independent allocations, and passes allocated indices plus external attributes to the pure calculation module. `paragon-calculator.js` validates board/node identity and combines pinned core-stat formulas with board-scoped records from `paragon-bonus-registry.js`. Missing or mismatched numerical evidence is reported as unresolved rather than zero. The UI has a responsive, collapsible Paragon-only Total Stats sidebar beside the board; it derives totals and hover contributors from calculator node evaluations, excluding external attributes and inactive conditionals.
 
-Boards 01–03 have no authored starting node. The viewer lets the user choose one of their four gates as a **local allocation anchor**. This is a drafting convenience, not board attachment.
+Boards 01–06 have no authored starting node. The viewer lets the user choose one of their four gates as a **local allocation anchor**. This is a drafting convenience, not board attachment.
 
 ## Data source
 
@@ -25,13 +28,16 @@ Relevant upstream paths:
 - `json/base/meta/ParagonBoard/Paragon_Paladin_01.pbd.json`
 - `json/base/meta/ParagonBoard/Paragon_Paladin_02.pbd.json`
 - `json/base/meta/ParagonBoard/Paragon_Paladin_03.pbd.json`
+- `json/base/meta/ParagonBoard/Paragon_Paladin_04.pbd.json`
+- `json/base/meta/ParagonBoard/Paragon_Paladin_05.pbd.json`
+- `json/base/meta/ParagonBoard/Paragon_Paladin_06.pbd.json`
 - `json/base/meta/ParagonNode/*.pgn.json`
 - `json/base/meta/ParagonThreshold/*.pth.json`
 - `json/base/meta/GameBalance/AttributeFormulas.gam.json`
 
-Local board copies are `paladin-board-00.json` through `paladin-board-03.json`. Board-specific node metadata is in `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-03.json`. Reusable definitions live in `paragon-visual/shared-node-definitions.js` with explicit board-SNO applicability. Loading rejects duplicate names, duplicate SNOs, conflicts, unsupported boards, revision mismatches, and formula-source mismatches.
+Local board copies are `paladin-board-00.json` through `paladin-board-06.json`. Board-specific node metadata is in `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-06.json`. Reusable definitions live in `paragon-visual/shared-node-definitions.js` with explicit board-SNO applicability. Loading rejects duplicate names, duplicate SNOs, conflicts, unsupported boards, revision mismatches, and formula-source mismatches.
 
-Shared definitions include the four Normal core-stat nodes, the Gate, and Magic Intelligence, Willpower, and Maximum Life on all boards. Magic Armor applies to 00/01, Magic Block Chance and Damage to Crowd Controlled to 01/02, Magic Physical Damage to 01–03, and Magic Damage to 00/02. Numerical resolution still requires the calculator's pinned formula checks or the correct board-scoped bonus registry.
+Shared definitions include the four Normal core-stat nodes, the Gate, and Magic Intelligence and Willpower on all boards. Magic Maximum Life applies to 00–05, Magic Armor to 00/01, Magic Block Chance and Damage to Crowd Controlled to 01/02, Magic Physical Damage to 01–03, and Magic Damage to 00/02/05. Numerical resolution still requires the calculator's pinned formula checks or the correct board-scoped bonus registry.
 
 Remaining board-specific definitions include Board 00's Magic Damage to Elites, Rares, socket, and start node; Board 01's Magic Armor Percent, All Resistance, and Strength plus its Rares, socket, and Legendary; and Board 02's Magic Thorns, Rares, socket, and Legendary. Rare and Legendary definitions were not moved.
 
@@ -39,7 +45,7 @@ Board 03 keeps board-specific definitions for Magic Armor Percent, All Resistanc
 
 ## Implemented and verified functionality
 
-All four boards render at their source coordinates and share the established node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations.
+All seven boards render at their source coordinates and share the established node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations.
 
 External attributes remain editable and locally persisted above the board. Verified and total-threshold breakdowns, raw bonuses, unresolved diagnostics, and provenance are retained in a closed-by-default **Advanced Calculation Details** section. The detailed raw-bonus view includes flat Thorns with Base / Conditional / Total values and no percent suffix.
 
@@ -104,14 +110,31 @@ Threshold evaluation uses total character attributes: external inputs plus verif
 
 Fervent displays Critical Strike Damage as a percentage and Maximum Faith as a flat value. Tooltips display threshold progress, and the raw bonus breakdown shows base and active conditional amounts separately. The Legendary power remains unresolved. Glyphs, rotation, attachment, and multi-board aggregation are outside this implementation.
 
+### Boards 04–06 — Preacher, Divinity, and Relentless
+
+The board names come from the pinned English localization. Each 21×21 grid contains 30 Magic, six Rare, four Gate, one Socket, and one Legendary cell. Gates occupy zero-based coordinates `(10, 0)`, `(0, 10)`, `(20, 10)`, and `(10, 20)`. The viewer uses separate calculation contexts 4, 5, and 6 for these registries. Those context numbers describe the viewer's board selection and do not establish in-game placements or Rare requirements.
+
+| Board / SNO | Occupied cells / merged definitions | Reused Magic values | Reused Rare bases |
+|---|---:|---|---|
+| Preacher / `2438973` | 160 / 22 | +2% Maximum Life, +1.5% Resistance to All Elements | — |
+| Divinity / `2438992` | 185 / 21 | +5% Damage, +2% Maximum Life, +1.5% Total Armor, +1.5% Resistance to All Elements | Sturdy +3% Total Armor and +4% Maximum Life, Defiance +3% Total Armor and +3% Resistance to All Elements |
+| Relentless / `2439024` | 171 / 20 | +1.5% Total Armor, +1.5% Resistance to All Elements | Defiance +3% Total Armor and +3% Resistance to All Elements |
+
+- All three use +5 Normal core stats, +5 to each core stat on Gates, and +7 Magic Intelligence and Willpower from verified pinned core-stat formulas. The exact-SNO Magic links preserve direct in-game provenance for Board 00 Maximum Life (`679184`) and Damage (`678754`), and Castle's formula-derived provenance for Armor Percent (`2127186`) and Resistance to All Elements (`678750`).
+- The reused Rare bases retain Fervent's direct in-game provenance for Sturdy (`2449942`) and Castle's unamplified planner provenance for Defiance (`2449713`). Both report their conditional amount and requirement as unresolved on the new boards.
+- **Preacher** needs Magic Attack Speed, Fortify, Healing Received, Damage While Fortified, and Damage While Healthy values, plus base values and conditionals for Hearty, Whale, Recovery, Bolster, Inner Strength, and Friction. Inner Strength carries `Druid_Willpower+Dexterity` and `WillPowerSide2` selectors in the pinned node. Its applicable Paladin requirement still needs evidence.
+- **Divinity** needs Magic Vulnerable Damage and the value for SNO `691371`. The pinned definition for `Generic_Magic_DamageReductionFromVulnerable` carries `Armor_Percent` and `ParagonNodeArmorBonus_Magic` despite its internal name, and has no exact-SNO value record. Oppressive, Cautious Fighter, Flayer, and Champion still need base values. All six Rare conditionals remain unresolved.
+- **Relentless** needs Magic Movement Speed, Vulnerable Damage, and Cooldown Reduction values. Battering Ram, Cull, Inured, Endure, and Dervish still need base values. All six Rare conditionals remain unresolved.
+- Capture unamplified tooltips or equivalent numerical evidence for the exact unresolved nodes. Rare conditionals need the added amount, actual requirement at the observed equip position, and activation rules for any paired or multiple selectors.
+
 ## Important files
 
 - `paragon-visual/index.html`, `style.css`, `app.js` — UI, rendering, interaction, persistence.
 - `paragon-visual/paragon-calculator.js` — calculation and unresolved-bonus engine.
 - `paragon-visual/paragon-bonus-registry.js` — revision/board/SNO-scoped numerical evidence.
 - `paragon-visual/shared-node-definitions.js` — authoritative pinned reusable Normal, compatible Magic, and verified Gate definitions with per-board applicability and merge validation.
-- `paladin-board-00.json` through `paladin-board-03.json` — board grids.
-- `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-03.json` — board-specific definitions.
+- `paladin-board-00.json` through `paladin-board-06.json` — board grids.
+- `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-06.json` — board-specific definitions.
 - `research/paragon-completeness-audit.md` — Board 00 audit.
 - `research/paragon-raw-bonuses.md` — Board 00 observations and calculator boundaries.
 - `research/tenacity-threshold-investigation.md` — class ordering and Tenacity experiment.
@@ -124,8 +147,9 @@ Fervent displays Critical Strike Damage as a percentage and Maximum Faith as a f
 - Board 01 uses `d4-paragon-paladin-01-v1`; its value contains `entryNodeIndex` and `allocatedNodeIndices`.
 - Board 02 uses `d4-paragon-paladin-02-v1`; its value contains `entryNodeIndex` and `allocatedNodeIndices`.
 - Board 03 uses `d4-paragon-paladin-03-v1`. Its value contains `entryNodeIndex` and `allocatedNodeIndices`.
+- Boards 04–06 use their own `d4-paragon-paladin-04-v1`, `d4-paragon-paladin-05-v1`, and `d4-paragon-paladin-06-v1` keys with the same gate and allocation fields.
 - External attributes use `d4-paragon-paladin-00-external-attributes-v1` and are shared by the calculator view.
-- Build-file import/export remains **Board 00 only**, schema version 1. Boards 01–03 disable these buttons.
+- Build-file import/export remains **Board 00 only**, schema version 1. Boards 01–06 disable these buttons.
 
 ## Known limitations
 
@@ -153,8 +177,12 @@ Fervent validation compared its grid and all 21 merged definitions to the pinned
 
 Final Fervent validation checked all six Rare bases and 24 conditional scenarios, including either side of an AND requirement failing, and confirmed that Magic and Rare Faith accumulate once per applicable bonus. The full-grid diagnostic reports zero unresolved ordinary bonuses. Boards 00–02 matched their pre-change outputs again across all 1,360 comparisons. Chrome also confirmed that Surgical's flat Faith total and tooltip update when total Strength reaches 1,345, persist through board switches, and recalculate on refund.
 
+Boards 04–06 were checked cell by cell against the pinned grid and node files, including names, SNOs, coordinates, attributes, conditional slots, and selectors. Calculator checks covered each unique node, numerical reuse and provenance, revision and context rejection, and unresolved reporting. The full-grid diagnostics report 29, 19, and 26 unresolved entries respectively, including one Legendary per board. Boards 00–03 matched pre-change calculator output in 2,732 comparisons. Headless Chrome over HTTP verified all seven board selections, gate anchoring, connected allocation, blocked and successful refunds, tooltips, and independent restores for Boards 04–06 in a fresh page.
+
 ## Current boundary
 
 Board 02 structural rendering, supported shared Normal/Gate/Magic calculations (including direct flat Thorns), one base-only exact Castle Rare record, four direct Thorns/Stalwart Rare records, and two Board 02 planner-observed Rare records are complete. Do not infer its remaining Magic, threshold, Legendary, glyph, rotation, attachment, or multi-board build-schema behavior without separate evidence and scope.
 
 Fervent supports structural rendering, independent gate-anchored allocation, and every ordinary numerical bonus in equip context 3.
+
+Boards 04–06 support their pinned layouts, independent gate-anchored allocations, and the verified amounts listed above. Unsupported numerical effects remain unresolved. No Rare conditional bonuses are active on these boards.
