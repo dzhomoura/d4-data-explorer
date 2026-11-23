@@ -60,8 +60,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 4,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      rareThresholdsUnverified: true,
-      calculationScope: "Preacher includes verified core stats, Magic Maximum Life, and Magic Resistance to All Elements. Other Magic, Rare, and Legendary effects remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Preacher includes the observed Rare bonuses and equip-index-4 thresholds. Magic Healing Received and the Legendary power remain unresolved."
     }),
     board05: Object.freeze({
       label: "Board 05 — Divinity",
@@ -71,8 +71,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 5,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      rareThresholdsUnverified: true,
-      calculationScope: "Divinity includes verified core stats, selected Magic bonuses, and the observed Sturdy and Defiance bases. Other Magic and Rare effects, all Rare thresholds, and the Legendary power remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Divinity resolves ordinary node bonuses and all six observed Rare thresholds at equip index 5. The Legendary power remains unresolved."
     }),
     board06: Object.freeze({
       label: "Board 06 — Relentless",
@@ -82,8 +82,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 6,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      rareThresholdsUnverified: true,
-      calculationScope: "Relentless includes verified core stats, Magic Armor and Resistance to All Elements, and the observed Defiance base. Other Magic and Rare effects, all Rare thresholds, and the Legendary power remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Relentless resolves ordinary node bonuses and all six observed Rare thresholds at equip index 6. The Legendary power remains unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -186,6 +186,54 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       unconditional: document.getElementById("raw-faith-base"),
       conditional: document.getElementById("raw-faith-conditional"),
       total: document.getElementById("raw-faith-total")
+    },
+    attackSpeed: {
+      panel: document.getElementById("raw-attack-speed-panel"),
+      unconditional: document.getElementById("raw-attack-speed-base"),
+      conditional: document.getElementById("raw-attack-speed-conditional"),
+      total: document.getElementById("raw-attack-speed-total")
+    },
+    fortifyGeneration: {
+      panel: document.getElementById("raw-fortify-panel"),
+      unconditional: document.getElementById("raw-fortify-base"),
+      conditional: document.getElementById("raw-fortify-conditional"),
+      total: document.getElementById("raw-fortify-total")
+    },
+    healingReceived: {
+      panel: document.getElementById("raw-healing-panel"),
+      unconditional: document.getElementById("raw-healing-base"),
+      conditional: document.getElementById("raw-healing-conditional"),
+      total: document.getElementById("raw-healing-total")
+    },
+    damageWhileFortified: {
+      panel: document.getElementById("raw-damage-fortified-panel"),
+      unconditional: document.getElementById("raw-damage-fortified-base"),
+      conditional: document.getElementById("raw-damage-fortified-conditional"),
+      total: document.getElementById("raw-damage-fortified-total")
+    },
+    damageWhileHealthy: {
+      panel: document.getElementById("raw-damage-healthy-panel"),
+      unconditional: document.getElementById("raw-damage-healthy-base"),
+      conditional: document.getElementById("raw-damage-healthy-conditional"),
+      total: document.getElementById("raw-damage-healthy-total")
+    },
+    vulnerableDamage: {
+      panel: document.getElementById("raw-vulnerable-panel"),
+      unconditional: document.getElementById("raw-vulnerable-base"),
+      conditional: document.getElementById("raw-vulnerable-conditional"),
+      total: document.getElementById("raw-vulnerable-total")
+    },
+    cooldownReduction: {
+      panel: document.getElementById("raw-cooldown-panel"),
+      unconditional: document.getElementById("raw-cooldown-base"),
+      conditional: document.getElementById("raw-cooldown-conditional"),
+      total: document.getElementById("raw-cooldown-total")
+    },
+    movementSpeed: {
+      panel: document.getElementById("raw-movement-speed-panel"),
+      unconditional: document.getElementById("raw-movement-speed-base"),
+      conditional: document.getElementById("raw-movement-speed-conditional"),
+      total: document.getElementById("raw-movement-speed-total")
     }
   };
   const statsSidebarList = document.getElementById("stats-sidebar-list");
@@ -217,7 +265,15 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     Block_Damage_Percent_Bonus: "Blocked Damage Reduction",
     Thorns_Flat: "Thorns",
     Crit_Damage_Percent: "Critical Strike Damage",
-    Resource_Max_Bonus: "Maximum Faith"
+    Resource_Max_Bonus: "Maximum Faith",
+    Attack_Speed_Percent_Bonus: "Attack Speed",
+    Fortified_Health_Application_Bonus: "Fortify Generation",
+    Bonus_Healing_Received_Percent: "Healing Received",
+    Damage_Percent_Bonus_When_Fortified: "Damage while Fortified",
+    Damage_Bonus_At_High_Health: "Damage while Healthy",
+    Vulnerable_Health_Damage_Bonus: "Vulnerable Damage",
+    Power_Cooldown_Reduction_Percent_All: "Cooldown Reduction",
+    Movement_Bonus_Run_Speed: "Movement Speed"
   };
   const CORE_ATTRIBUTE_NAMES = Object.freeze({
     Strength_Core: "Strength",
@@ -237,7 +293,15 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     blockedDamageReduction: "Blocked Damage Reduction",
     thorns: "Thorns",
     criticalStrikeDamage: "Critical Strike Damage",
-    maximumFaith: "Maximum Faith"
+    maximumFaith: "Maximum Faith",
+    attackSpeed: "Attack Speed",
+    fortifyGeneration: "Fortify Generation",
+    healingReceived: "Healing Received",
+    damageWhileFortified: "Damage while Fortified",
+    damageWhileHealthy: "Damage while Healthy",
+    vulnerableDamage: "Vulnerable Damage",
+    cooldownReduction: "Cooldown Reduction",
+    movementSpeed: "Movement Speed"
   });
   const KIND_LABELS = {
     normal: "Normal",
@@ -354,20 +418,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
         if (calculation && !calculation.unresolved && calculation.unconditional !== null) {
           const valueLabel = calculation.category === "coreAttribute"
             ? attributeLabel(attribute.name)
-            : {
-              damage: "Damage",
-              damageToElites: "Damage to Elites",
-              physicalDamage: "Physical Damage",
-              damageToCrowdControlled: "Damage to Crowd Controlled",
-              maximumLifePercent: "Maximum Life",
-              totalArmorPercent: "Total Armor",
-              allResistance: "Resistance to All Elements",
-              blockChance: "Block Chance",
-              blockedDamageReduction: "Blocked Damage Reduction",
-              thorns: "Thorns",
-              criticalStrikeDamage: "Critical Strike Damage",
-              maximumFaith: "Maximum Faith"
-            }[calculation.category];
+            : RAW_BONUS_LABELS[calculation.category];
           const basePrefix = calculation.provenance === "verified-game-formula"
             ? "Verified bonus"
             : calculation.threshold ? "Base bonus" : "Raw bonus";
@@ -451,7 +502,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
           ? evaluation.requirements
             ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
             : `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
-          : evaluation || currentBoardConfig.rareThresholdsUnverified
+          : evaluation
             ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
             : `${threshold.name}: not evaluated`;
         const className = evaluation?.resolved
@@ -464,8 +515,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
         thresholds,
         "p",
         "tooltip-formula-note",
-        currentBoardConfig.rareThresholdsUnverified
-          ? "Rare threshold requirements are unverified for this board."
+        currentBoardConfig.observedRareThresholds
+          ? `Rare thresholds use total attributes and the observed equip-index-${currentBoardConfig.boardEquipIndex} requirements.`
           : currentBoardKey === "board00"
             ? "Only the in-game verified starting-board requirement is evaluated."
             : currentBoardKey === "board03"

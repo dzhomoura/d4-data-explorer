@@ -125,14 +125,17 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
   if (!record.thresholdReference) {
     return { resolved: false, thresholdReference: null, reason: "Conditional bonus has no threshold reference." };
   }
-  if (!nodeRecord?.ptBonusAttributeIndices?.includes(record.attributeIndex)) {
+  const definitionSlots = definition.ptBonusAttributeIndices;
+  if (!nodeRecord?.ptBonusAttributeIndices?.includes(record.attributeIndex)
+    || (definitionSlots && !definitionSlots.includes(record.attributeIndex))) {
     return {
       resolved: false,
       thresholdReference: record.thresholdReference,
       reason: "Attribute index is not marked by ptBonusAttributeIndices."
     };
   }
-  if (!definition.thresholdReferences.some((threshold) => threshold.name === record.thresholdReference)) {
+  const definitionThreshold = definition.thresholdReferences.find((entry) => entry.name === record.thresholdReference);
+  if (!definitionThreshold) {
     return {
       resolved: false,
       thresholdReference: record.thresholdReference,
@@ -148,6 +151,13 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
   }
 
   const threshold = boardRegistry?.thresholds[record.thresholdReference];
+  if (threshold && definitionThreshold.snoId !== undefined && threshold.snoId !== definitionThreshold.snoId) {
+    return {
+      resolved: false,
+      thresholdReference: record.thresholdReference,
+      reason: "Threshold SNO does not match the node definition."
+    };
+  }
   if (threshold && threshold.observedBoardEquipIndex !== boardRegistry?.observedBoardEquipIndex) {
     return {
       resolved: false,

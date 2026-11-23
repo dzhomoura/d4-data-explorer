@@ -8,9 +8,9 @@ This is a dependency-free browser viewer/calculator for Diablo IV Paladin Parago
 - **Board 01 — Castle** (SNO `2436511`), modeled as the first additional board (`ParagonBoardEquipIndex = 1`)
 - **Board 02 — Shield Bearer** (SNO `2436844`), with selected verified shared core-stat and Magic bonuses
 - **Board 03 — Fervent** (SNO `2438913`), with complete ordinary numerical bonuses at equip index 3
-- **Board 04 — Preacher** (SNO `2438973`)
-- **Board 05 — Divinity** (SNO `2438992`)
-- **Board 06 — Relentless** (SNO `2439024`)
+- **Board 04 — Preacher** (SNO `2438973`), with all six Rare bonuses and one unresolved Magic node type
+- **Board 05 — Divinity** (SNO `2438992`), with complete ordinary numerical bonuses at equip index 5
+- **Board 06 — Relentless** (SNO `2439024`), with complete ordinary numerical bonuses at equip index 6
 
 `paragon-visual/app.js` loads board/node JSON, merges revision-pinned definitions from `shared-node-definitions.js` according to board SNO, renders the 21×21 grid, manages zoom/pan/tooltips and allocation connectivity, persists independent allocations, and passes allocated indices plus external attributes to the pure calculation module. `paragon-calculator.js` validates board/node identity and combines pinned core-stat formulas with board-scoped records from `paragon-bonus-registry.js`. Missing or mismatched numerical evidence is reported as unresolved rather than zero. The UI has a responsive, collapsible Paragon-only Total Stats sidebar beside the board; it derives totals and hover contributors from calculator node evaluations, excluding external attributes and inactive conditionals.
 
@@ -112,20 +112,44 @@ Fervent displays Critical Strike Damage as a percentage and Maximum Faith as a f
 
 ### Boards 04–06 — Preacher, Divinity, and Relentless
 
-The board names come from the pinned English localization. Each 21×21 grid contains 30 Magic, six Rare, four Gate, one Socket, and one Legendary cell. Gates occupy zero-based coordinates `(10, 0)`, `(0, 10)`, `(20, 10)`, and `(10, 20)`. The viewer uses separate calculation contexts 4, 5, and 6 for these registries. Those context numbers describe the viewer's board selection and do not establish in-game placements or Rare requirements.
+The board names come from the pinned English localization. Each 21×21 grid contains 30 Magic, six Rare, four Gate, one Socket, and one Legendary cell. Gates occupy zero-based coordinates `(10, 0)`, `(0, 10)`, `(20, 10)`, and `(10, 20)`. The viewer evaluates each board's direct Rare observations only in its calculation context of 4, 5, or 6. Gate anchoring remains a local allocation feature.
 
-| Board / SNO | Occupied cells / merged definitions | Reused Magic values | Reused Rare bases |
-|---|---:|---|---|
-| Preacher / `2438973` | 160 / 22 | +2% Maximum Life, +1.5% Resistance to All Elements | — |
-| Divinity / `2438992` | 185 / 21 | +5% Damage, +2% Maximum Life, +1.5% Total Armor, +1.5% Resistance to All Elements | Sturdy +3% Total Armor and +4% Maximum Life, Defiance +3% Total Armor and +3% Resistance to All Elements |
-| Relentless / `2439024` | 171 / 20 | +1.5% Total Armor, +1.5% Resistance to All Elements | Defiance +3% Total Armor and +3% Resistance to All Elements |
+| Board / SNO | Occupied cells / merged definitions | Reused Magic values |
+|---|---:|---|
+| Preacher / `2438973` | 160 / 22 | +2% Maximum Life, +1.5% Resistance to All Elements |
+| Divinity / `2438992` | 185 / 21 | +5% Damage, +2% Maximum Life, +1.5% Total Armor, +1.5% Resistance to All Elements |
+| Relentless / `2439024` | 171 / 20 | +1.5% Total Armor, +1.5% Resistance to All Elements, +6% Vulnerable Damage |
 
 - All three use +5 Normal core stats, +5 to each core stat on Gates, and +7 Magic Intelligence and Willpower from verified pinned core-stat formulas. The exact-SNO Magic links preserve direct in-game provenance for Board 00 Maximum Life (`679184`) and Damage (`678754`), and Castle's formula-derived provenance for Armor Percent (`2127186`) and Resistance to All Elements (`678750`).
-- The reused Rare bases retain Fervent's direct in-game provenance for Sturdy (`2449942`) and Castle's unamplified planner provenance for Defiance (`2449713`). Both report their conditional amount and requirement as unresolved on the new boards.
-- **Preacher** needs Magic Attack Speed, Fortify, Healing Received, Damage While Fortified, and Damage While Healthy values, plus base values and conditionals for Hearty, Whale, Recovery, Bolster, Inner Strength, and Friction. Inner Strength carries `Druid_Willpower+Dexterity` and `WillPowerSide2` selectors in the pinned node. Its applicable Paladin requirement still needs evidence.
-- **Divinity** needs Magic Vulnerable Damage and the value for SNO `691371`. The pinned definition for `Generic_Magic_DamageReductionFromVulnerable` carries `Armor_Percent` and `ParagonNodeArmorBonus_Magic` despite its internal name, and has no exact-SNO value record. Oppressive, Cautious Fighter, Flayer, and Champion still need base values. All six Rare conditionals remain unresolved.
-- **Relentless** needs Magic Movement Speed, Vulnerable Damage, and Cooldown Reduction values. Battering Ram, Cull, Inured, Endure, and Dervish still need base values. All six Rare conditionals remain unresolved.
-- Capture unamplified tooltips or equivalent numerical evidence for the exact unresolved nodes. Rare conditionals need the added amount, actual requirement at the observed equip position, and activation rules for any paired or multiple selectors.
+- Earlier implementation reused the Sturdy base from Fervent's direct in-game observation and the Defiance base from Castle's unamplified planner observation. Both values are now independently observed with their conditions on the applicable new boards. The original records remain on Fervent and Castle.
+- Preacher's direct Magic observations are +5% Damage while Fortified (`679050`), +6.3% Damage while Healthy (`679054`), +1.3% Attack Speed (`679060`), and +1.6% Fortify Generation (`1023952`). The three Magic Healing Received cells (`Generic_Magic_HealingBonus`, `1195913`) still need an unamplified tooltip or equivalent numerical evidence for that exact node. Its pinned `ParagonNodeHealingBonus_Magic` formula remains documented in node metadata.
+- Divinity's direct Magic observations are +6% Vulnerable Damage (`678863`) and +1.5% Total Armor (`691371`). SNO `691371` retains its internal name `Generic_Magic_DamageReductionFromVulnerable`. Its pinned `Armor_Percent` attribute and observed tooltip both identify Total Armor.
+- Relentless's direct Magic observations are +1% Cooldown Reduction (`679022`) and +2% Movement Speed (`679218`). It reuses the Divinity Vulnerable Damage observation for the identical `Generic_Magic_DamageToVulnerable` definition and SNO `678863`, preserving direct in-game provenance and using Relentless's registry scope.
+
+The Rare amounts and requirements below are direct in-game observations. Pinned definitions verify the node, bonus slot, attribute identity, and selector. Requirements use total character attributes, including external inputs and verified allocated Paragon stats. Base bonuses apply whenever the node is allocated. Both requirements must pass for paired conditions.
+
+| Board | Rare node / SNO | Observed base | Observed extra bonus and requirement | Pinned selector |
+|---|---|---|---|---|
+| 04 | Friction / `2449777` | +3% All Resistance, +1.3% Attack Speed | +3% All Resistance at 1,215 STR | `StrengthMain2` |
+| 04 | Recovery / `2449780` | +6% Healing Received, +4% Maximum Life | +6% Healing Received at 1,345 STR | `StrengthMain3` |
+| 04 | Bolster / `2449782` | +3.2% Fortify Generation, +4% Maximum Life | +3.2% Fortify Generation at 1,085 STR | `StrengthMain1` |
+| 04 | Hearty / `2449784` | +4% Maximum Life, +10 STR | +4% Maximum Life at 265 WIL | `WillPowerSide1` |
+| 04 | Whale / `2449786` | +1.3% Attack Speed, +10 STR | +1.3% Attack Speed at 265 INT | `IntelligenceSide1` |
+| 04 | Inner Strength / `679987` | +10% Damage while Fortified, +12.5% Damage while Healthy | +10% Damage while Fortified at 285 WIL | `WillPowerSide2` |
+| 05 | Champion / `2449940` | +10% Damage, +10 STR | +10% Damage at 265 WIL | `WillPowerSide1` |
+| 05 | Flayer / `671197` | +13% Vulnerable Damage, +10 STR | +13% Vulnerable Damage at 285 WIL | `WillPowerSide2` |
+| 05 | Cautious Fighter / `2449796` | +10% Damage, +3% All Resistance | +10% Damage at 1,085 STR | `StrengthMain1` |
+| 05 | Oppressive / `2504935` | +13% Vulnerable Damage, +2% Total Armor | +13% Vulnerable Damage at 285 INT | `IntelligenceSide2` |
+| 05 | Defiance / `2449713` | +3% Total Armor, +3% All Resistance | +3% Total Armor at 1,345 STR | `StrengthMain3` |
+| 05 | Sturdy / `2449942` | +3% Total Armor, +4% Maximum Life | +3% Total Armor at 265 INT | `IntelligenceSide1` |
+| 06 | Dervish / `2449810` | +10 STR, +2% Cooldown Reduction | +2% Cooldown Reduction at 305 INT | `IntelligenceSide3` |
+| 06 | Endure / `2449913` | +3% All Resistance, +10 STR | +3% All Resistance at 305 WIL | `WillPowerSide3` |
+| 06 | Inured / `2449804` | +2% Cooldown Reduction, +2% Total Armor | +2% Cooldown Reduction at 265 INT | `IntelligenceSide1` |
+| 06 | Defiance / `2449713` | +3% Total Armor, +3% All Resistance | +3% Total Armor at 1,345 STR | `StrengthMain3` |
+| 06 | Battering Ram / `2449800` | +5% Movement Speed, +2% Total Armor | +5% Movement Speed at 1,155 STR AND 260 INT | `Paladin_Strength+Intelligence` |
+| 06 | Cull / `2449802` | +13% Vulnerable Damage, +5% Movement Speed | +13% Vulnerable Damage at 1,155 STR AND 260 WIL | `Paladin_Strength+Willpower` |
+
+Inner Strength's pinned `Druid_Willpower+Dexterity` selector is ineligible for Paladin. The Paladin observation matches `WillPowerSide2`. Dervish marks zero-based slot 1 for its Cooldown Reduction conditional. Damage while Fortified and while Healthy are shown as separate raw bonus categories. Totals track the allocated per-node contributions.
 
 ## Important files
 
@@ -179,10 +203,12 @@ Final Fervent validation checked all six Rare bases and 24 conditional scenarios
 
 Boards 04–06 were checked cell by cell against the pinned grid and node files, including names, SNOs, coordinates, attributes, conditional slots, and selectors. Calculator checks covered each unique node, numerical reuse and provenance, revision and context rejection, and unresolved reporting. The full-grid diagnostics report 29, 19, and 26 unresolved entries respectively, including one Legendary per board. Boards 00–03 matched pre-change calculator output in 2,732 comparisons. Headless Chrome over HTTP verified all seven board selections, gate anchoring, connected allocation, blocked and successful refunds, tooltips, and independent restores for Boards 04–06 in a fresh page.
 
+After the direct observations were added, all 58 Rare threshold scenarios and 17 repeated Magic-node checks passed. The threshold checks covered below, at, and above each requirement, either side of each AND requirement failing, base preservation, allocated attributes, and single application. Mismatched slots, selector SNOs, attribute parameters, and equip contexts were rejected. Boards 00–03 again matched their pre-change outputs in 2,732 cases. The full-grid ordinary unresolved counts are now 3, 0, and 0 for Boards 04, 05, and 06 respectively, plus one separate unresolved Legendary per board. Headless Chrome verified threshold transitions, percentage totals, tooltips, allocation, refunds, switching, and independent saves restored in a fresh page.
+
 ## Current boundary
 
 Board 02 structural rendering, supported shared Normal/Gate/Magic calculations (including direct flat Thorns), one base-only exact Castle Rare record, four direct Thorns/Stalwart Rare records, and two Board 02 planner-observed Rare records are complete. Do not infer its remaining Magic, threshold, Legendary, glyph, rotation, attachment, or multi-board build-schema behavior without separate evidence and scope.
 
 Fervent supports structural rendering, independent gate-anchored allocation, and every ordinary numerical bonus in equip context 3.
 
-Boards 04–06 support their pinned layouts, independent gate-anchored allocations, and the verified amounts listed above. Unsupported numerical effects remain unresolved. No Rare conditional bonuses are active on these boards.
+Boards 04–06 support all 18 observed Rare conditionals. Divinity and Relentless have complete ordinary numerical coverage. Preacher's three Magic Healing Received cells remain unresolved.

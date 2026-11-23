@@ -689,42 +689,423 @@ export const FERVENT_BONUS_REGISTRY = {
   }
 };
 
-// These contexts identify the viewer's separate board calculations.
-// Thresholds require evidence for the specific board and equip position.
+// Board-scoped observations preserve the pinned selectors and the measured
+// requirements for each equip context.
 export const PREACHER_BONUS_REGISTRY = {
   sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
   boardSnoId: 2438973,
   observedBoardEquipIndex: 4,
-  thresholds: {},
+  additionalBonusCategories: ["attackSpeed", "fortifyGeneration", "healingReceived", "damageWhileFortified", "damageWhileHealthy"],
+  thresholds: {
+    StrengthMain2: {
+      snoId: 1015344,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1215,
+      observedBoardEquipIndex: 4,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain3: {
+      snoId: 1015346,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1345,
+      observedBoardEquipIndex: 4,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain1: {
+      snoId: 1015345,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1085,
+      observedBoardEquipIndex: 4,
+      provenance: DIRECT_IN_GAME
+    },
+    WillPowerSide1: {
+      snoId: 1015310,
+      requiredAttribute: "Willpower",
+      requiredAttributeId: 20,
+      requiredValue: 265,
+      observedBoardEquipIndex: 4,
+      provenance: DIRECT_IN_GAME
+    },
+    IntelligenceSide1: {
+      snoId: 1015350,
+      requiredAttribute: "Intelligence",
+      requiredAttributeId: 19,
+      requiredValue: 265,
+      observedBoardEquipIndex: 4,
+      provenance: DIRECT_IN_GAME
+    },
+    WillPowerSide2: {
+      snoId: 1015277,
+      requiredAttribute: "Willpower",
+      requiredAttributeId: 20,
+      requiredValue: 285,
+      observedBoardEquipIndex: 4,
+      provenance: DIRECT_IN_GAME
+    }
+  },
   reuseNodeRecords: [
     { sourceBoardSnoId: 2436481, nodeSnoIds: [679184] },
     { sourceBoardSnoId: 2436511, nodeSnoIds: [678750] }
   ],
-  nodes: {}
+  nodes: {
+    "2449777": {
+      name: "Paladin_Rare_024",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_024.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", attributeParam: -1, formulaReference: "ParagonNodeResistAll_RareMajor", category: "allResistance", base: 3, conditional: 3, thresholdReference: "StrengthMain2", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 221, attributeName: "Attack_Speed_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeAttackSpeed_RareMinor", category: "attackSpeed", base: 1.3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449780": {
+      name: "Paladin_Rare_025",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_025.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 65, attributeName: "Bonus_Healing_Received_Percent", attributeParam: -1, formulaReference: "ParagonNodeHealingBonus_RareMajor", category: "healingReceived", base: 6, conditional: 6, thresholdReference: "StrengthMain3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeHPMaxBonus_RareMinor", category: "maximumLifePercent", base: 4, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449782": {
+      name: "Paladin_Rare_026",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_026.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 747, attributeName: "Fortified_Health_Application_Bonus", attributeParam: -1, formulaReference: "ParagonNodeFortifyBonus_RareMajor", category: "fortifyGeneration", base: 3.2, conditional: 3.2, thresholdReference: "StrengthMain1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeHPMaxBonus_RareMinor", category: "maximumLifePercent", base: 4, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449784": {
+      name: "Paladin_Rare_027",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_027.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeHPMaxBonus_RareMajor", category: "maximumLifePercent", base: 4, conditional: 4, thresholdReference: "WillPowerSide1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449786": {
+      name: "Paladin_Rare_028",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_028.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 221, attributeName: "Attack_Speed_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeAttackSpeed_RareMajor", category: "attackSpeed", base: 1.3, conditional: 1.3, thresholdReference: "IntelligenceSide1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679987": {
+      name: "Generic_Rare_026",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Rare_026.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 748, attributeName: "Damage_Percent_Bonus_When_Fortified", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusWhileFortified_RareMajor", category: "damageWhileFortified", base: 10, conditional: 10, thresholdReference: "WillPowerSide2", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 1123, attributeName: "Damage_Bonus_At_High_Health", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusWhileHealthy_RareMinor", category: "damageWhileHealthy", base: 12.5, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679050": {
+      name: "Generic_Magic_DamageWhileFortified",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_DamageWhileFortified.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 748, attributeName: "Damage_Percent_Bonus_When_Fortified", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusWhileFortified_Magic", category: "damageWhileFortified", base: 5, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679054": {
+      name: "Generic_Magic_DamageWhileHealthy",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_DamageWhileHealthy.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 1123, attributeName: "Damage_Bonus_At_High_Health", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusWhileHealthy_Magic", category: "damageWhileHealthy", base: 6.3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679060": {
+      name: "Generic_Magic_AttackSpeed",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_AttackSpeed.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 221, attributeName: "Attack_Speed_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeAttackSpeedBySkillTag_Magic", category: "attackSpeed", base: 1.3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "1023952": {
+      name: "Generic_Magic_BonusFortify",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_BonusFortify.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 747, attributeName: "Fortified_Health_Application_Bonus", attributeParam: -1, formulaReference: "ParagonNodeFortifyBonus_Magic", category: "fortifyGeneration", base: 1.6, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    }
+  }
 };
 
 export const DIVINITY_BONUS_REGISTRY = {
   sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
   boardSnoId: 2438992,
   observedBoardEquipIndex: 5,
-  thresholds: {},
+  additionalBonusCategories: ["vulnerableDamage"],
+  thresholds: {
+    WillPowerSide1: {
+      snoId: 1015310,
+      requiredAttribute: "Willpower",
+      requiredAttributeId: 20,
+      requiredValue: 265,
+      observedBoardEquipIndex: 5,
+      provenance: DIRECT_IN_GAME
+    },
+    WillPowerSide2: {
+      snoId: 1015277,
+      requiredAttribute: "Willpower",
+      requiredAttributeId: 20,
+      requiredValue: 285,
+      observedBoardEquipIndex: 5,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain1: {
+      snoId: 1015345,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1085,
+      observedBoardEquipIndex: 5,
+      provenance: DIRECT_IN_GAME
+    },
+    IntelligenceSide2: {
+      snoId: 1015351,
+      requiredAttribute: "Intelligence",
+      requiredAttributeId: 19,
+      requiredValue: 285,
+      observedBoardEquipIndex: 5,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain3: {
+      snoId: 1015346,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1345,
+      observedBoardEquipIndex: 5,
+      provenance: DIRECT_IN_GAME
+    },
+    IntelligenceSide1: {
+      snoId: 1015350,
+      requiredAttribute: "Intelligence",
+      requiredAttributeId: 19,
+      requiredValue: 265,
+      observedBoardEquipIndex: 5,
+      provenance: DIRECT_IN_GAME
+    }
+  },
   reuseNodeRecords: [
     { sourceBoardSnoId: 2436481, nodeSnoIds: [678754, 679184] },
-    { sourceBoardSnoId: 2436511, nodeSnoIds: [2127186, 678750] },
-    { sourceBoardSnoId: 2436511, nodeSnoIds: [2449713], baseOnly: true, reportUnresolvedConditional: true },
-    { sourceBoardSnoId: 2438913, nodeSnoIds: [2449942], baseOnly: true, reportUnresolvedConditional: true }
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2127186, 678750] }
   ],
-  nodes: {}
+  nodes: {
+    "2449940": {
+      name: "Paladin_Rare_053",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_053.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 252, attributeName: "Damage_Percent_All_From_Skills", attributeParam: -1, formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "damage", base: 10, conditional: 10, thresholdReference: "WillPowerSide1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "671197": {
+      name: "Barbarian_Rare_004",
+      sourcePath: "json/base/meta/ParagonNode/Barbarian_Rare_004.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 736, attributeName: "Vulnerable_Health_Damage_Bonus", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusToVulnerable_RareMajor", category: "vulnerableDamage", base: 13, conditional: 13, thresholdReference: "WillPowerSide2", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449796": {
+      name: "Paladin_Rare_033",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_033.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 252, attributeName: "Damage_Percent_All_From_Skills", attributeParam: -1, formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "damage", base: 10, conditional: 10, thresholdReference: "StrengthMain1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", attributeParam: -1, formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2504935": {
+      name: "Paladin_Rare_059",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_059.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 736, attributeName: "Vulnerable_Health_Damage_Bonus", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusToVulnerable_RareMajor", category: "vulnerableDamage", base: 13, conditional: 13, thresholdReference: "IntelligenceSide2", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMinor", category: "totalArmorPercent", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449713": {
+      name: "Paladin_Rare_005",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_005.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMajor", category: "totalArmorPercent", base: 3, conditional: 3, thresholdReference: "StrengthMain3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", attributeParam: -1, formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449942": {
+      name: "Paladin_Rare_054",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_054.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMajor", category: "totalArmorPercent", base: 3, conditional: 3, thresholdReference: "IntelligenceSide1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeHPMaxBonus_RareMinor", category: "maximumLifePercent", base: 4, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "678863": {
+      name: "Generic_Magic_DamageToVulnerable",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_DamageToVulnerable.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 736, attributeName: "Vulnerable_Health_Damage_Bonus", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusToVulnerable_Magic", category: "vulnerableDamage", base: 6, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "691371": {
+      name: "Generic_Magic_DamageReductionFromVulnerable",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_DamageReductionFromVulnerable.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_Magic", category: "totalArmorPercent", base: 1.5, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    }
+  }
 };
 
 export const RELENTLESS_BONUS_REGISTRY = {
   sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
   boardSnoId: 2439024,
   observedBoardEquipIndex: 6,
-  thresholds: {},
+  additionalBonusCategories: ["vulnerableDamage", "movementSpeed", "cooldownReduction"],
+  thresholds: {
+    IntelligenceSide3: {
+      snoId: 1015352,
+      requiredAttribute: "Intelligence",
+      requiredAttributeId: 19,
+      requiredValue: 305,
+      observedBoardEquipIndex: 6,
+      provenance: DIRECT_IN_GAME
+    },
+    WillPowerSide3: {
+      snoId: 1015322,
+      requiredAttribute: "Willpower",
+      requiredAttributeId: 20,
+      requiredValue: 305,
+      observedBoardEquipIndex: 6,
+      provenance: DIRECT_IN_GAME
+    },
+    IntelligenceSide1: {
+      snoId: 1015350,
+      requiredAttribute: "Intelligence",
+      requiredAttributeId: 19,
+      requiredValue: 265,
+      observedBoardEquipIndex: 6,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain3: {
+      snoId: 1015346,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1345,
+      observedBoardEquipIndex: 6,
+      provenance: DIRECT_IN_GAME
+    },
+    "Paladin_Strength+Intelligence": {
+      snoId: 2504903,
+      combination: "all",
+      requirements: [
+        { requiredAttribute: "Strength", requiredAttributeId: 18, requiredValue: 1155 },
+        { requiredAttribute: "Intelligence", requiredAttributeId: 19, requiredValue: 260 }
+      ],
+      observedBoardEquipIndex: 6,
+      provenance: DIRECT_IN_GAME
+    },
+    "Paladin_Strength+Willpower": {
+      snoId: 2504901,
+      combination: "all",
+      requirements: [
+        { requiredAttribute: "Strength", requiredAttributeId: 18, requiredValue: 1155 },
+        { requiredAttribute: "Willpower", requiredAttributeId: 20, requiredValue: 260 }
+      ],
+      observedBoardEquipIndex: 6,
+      provenance: DIRECT_IN_GAME
+    }
+  },
   reuseNodeRecords: [
     { sourceBoardSnoId: 2436511, nodeSnoIds: [2127186, 678750] },
-    { sourceBoardSnoId: 2436511, nodeSnoIds: [2449713], baseOnly: true, reportUnresolvedConditional: true }
+    { sourceBoardSnoId: 2438992, nodeSnoIds: [678863] }
   ],
-  nodes: {}
+  nodes: {
+    "2449810": {
+      name: "Paladin_Rare_040",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_040.pgn.json",
+      ptBonusAttributeIndices: [1],
+      attributes: [
+        { attributeIndex: 0, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 237, attributeName: "Power_Cooldown_Reduction_Percent_All", attributeParam: -1, formulaReference: "ParagonNodeCDR_RareMajor", category: "cooldownReduction", base: 2, conditional: 2, thresholdReference: "IntelligenceSide3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449913": {
+      name: "Paladin_Rare_041",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_041.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", attributeParam: -1, formulaReference: "ParagonNodeResistAll_RareMajor", category: "allResistance", base: 3, conditional: 3, thresholdReference: "WillPowerSide3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449804": {
+      name: "Paladin_Rare_037",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_037.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 237, attributeName: "Power_Cooldown_Reduction_Percent_All", attributeParam: -1, formulaReference: "ParagonNodeCDR_RareMajor", category: "cooldownReduction", base: 2, conditional: 2, thresholdReference: "IntelligenceSide1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMinor", category: "totalArmorPercent", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449713": {
+      name: "Paladin_Rare_005",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_005.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMajor", category: "totalArmorPercent", base: 3, conditional: 3, thresholdReference: "StrengthMain3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", attributeParam: -1, formulaReference: "ParagonNodeResistAll_RareMinor", category: "allResistance", base: 3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449800": {
+      name: "Paladin_Rare_035",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_035.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 208, attributeName: "Movement_Bonus_Run_Speed", attributeParam: -1, formulaReference: "ParagonNodeMoveSpeed_RareMajor", category: "movementSpeed", base: 5, conditional: 5, thresholdReference: "Paladin_Strength+Intelligence", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMinor", category: "totalArmorPercent", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449802": {
+      name: "Paladin_Rare_036",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_036.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 736, attributeName: "Vulnerable_Health_Damage_Bonus", attributeParam: -1, formulaReference: "ParagonNodeDamageBonusToVulnerable_RareMajor", category: "vulnerableDamage", base: 13, conditional: 13, thresholdReference: "Paladin_Strength+Willpower", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 208, attributeName: "Movement_Bonus_Run_Speed", attributeParam: -1, formulaReference: "ParagonNodeMoveSpeed_RareMajor", category: "movementSpeed", base: 5, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679022": {
+      name: "Generic_Magic_CDR",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_CDR.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 237, attributeName: "Power_Cooldown_Reduction_Percent_All", attributeParam: -1, formulaReference: "ParagonNodeCDR_Magic", category: "cooldownReduction", base: 1, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "679218": {
+      name: "Generic_Magic_MoveSpeed",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_MoveSpeed.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 208, attributeName: "Movement_Bonus_Run_Speed", attributeParam: -1, formulaReference: "ParagonNodeMoveSpeed_Magic", category: "movementSpeed", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    }
+  }
 };
