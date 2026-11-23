@@ -1,5 +1,10 @@
 import { calculateParagonBonuses } from "./paragon-calculator.js";
 import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
+import { BOARD_ROTATIONS, rotateBoardPoint } from "./board-rotation.js";
+import {
+  buildConnectedLayout, calculateConnectedBonuses, CONNECTED_SAVE_KEY, DEFAULT_ATTACHMENT,
+  getAttachmentGates, readConnectedSave, validateConnectedAllocation, writeConnectedSave
+} from "./connected-boards.js";
 
 (() => {
   "use strict";
@@ -120,6 +125,12 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       calculationScope: "Beacon resolves ordinary node bonuses and all six observed Rare thresholds at equip index 9. The Legendary power remains unresolved."
     })
   });
+  const CONNECTED_CONFIG = Object.freeze({
+    label: "Connected Boards · Experimental",
+    requiresEntryGate: false,
+    supportsBuildFiles: false,
+    calculationScope: "These totals combine Starting Board and Castle at their supported equip contexts (0 and 1)."
+  });
   const POINT_COSTS = Object.freeze({
     start: 0,
     normal: 1,
@@ -135,6 +146,13 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   const frame = document.getElementById("board-frame");
   const status = document.getElementById("board-status");
   const boardSelector = document.getElementById("board-selector");
+  const rotationLabel = document.getElementById("board-rotation-label");
+  const rotationSelect = document.getElementById("board-rotation");
+  const connectedToggle = document.getElementById("connected-mode-toggle");
+  const attachmentPanel = document.getElementById("connected-controls");
+  const startingGateSelect = document.getElementById("starting-attachment-gate");
+  const castleEntrySelect = document.getElementById("castle-entry-gate");
+  const castleRotationSelect = document.getElementById("castle-attachment-rotation");
   const calculationScopeNote = document.getElementById("calculation-scope-note");
   const allocationMessage = document.getElementById("allocation-message");
   const pointsSpent = document.getElementById("points-spent");
@@ -382,12 +400,17 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   let panX = 0;
   let panY = 0;
   let drag = null;
-  let boardSize = 0;
+  let boardPixelWidth = 0;
+  let boardPixelHeight = 0;
   let activeTooltipMarker = null;
   let boardNodes = new Map();
   let allocationGraph = new Map();
   let allocatedNodeIds = new Set();
   let allocationRootId = null;
+  let boardRotation = 0;
+  let boardGrid = null;
+  let boardCells = [];
+  let connectionLayer = null;
   let allocatedConnectionLayer = null;
   let boardIdentity = null;
   let currentBoardDefinition = null;
@@ -399,6 +422,13 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   let currentBoardConfig = BOARD_CONFIGS.board00;
   const boardResources = new Map();
   const allocationsByBoard = new Map();
+  let connectedLayout = null;
+  let connectedAttachment = null;
+  let connectedAllocation = null;
+
+  function isConnectedMode() {
+    return currentBoardKey === "connected";
+  }
 
   function setStatus(message, isError) {
     status.textContent = message;
@@ -444,8 +474,11 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     return nodeEvaluation?.thresholds.find((threshold) => threshold.thresholdReference === thresholdName) || null;
   }
 
-  function buildTooltip(definition, nodeIndex) {
-    const nodeEvaluation = currentCalculation?.nodeEvaluations.find((node) => node.nodeIndex === nodeIndex) || null;
+  function buildTooltip(node) {
+    const { definition, id, boardId } = node;
+    const boardKey = boardId ?? currentBoardKey;
+    const config = BOARD_CONFIGS[boardKey];
+    const nodeEvaluation = currentCalculation?.nodeEvaluations.find(evaluation => (evaluation.nodeId ?? evaluation.nodeIndex) === id);
     tooltip.replaceChildren();
 
     const header = document.createElement("header");
@@ -454,6 +487,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     addText(header, "span", `tooltip-kind tooltip-kind--${definition.kind}`, KIND_LABELS[definition.kind] || "Node");
     tooltip.appendChild(header);
 
+    if (boardId) addText(tooltip, "p", "tooltip-meta", config.label);
     if (nodeEvaluation?.displayName) {
       addText(tooltip, "p", "tooltip-display-name", nodeEvaluation.displayName);
     }
@@ -566,7 +600,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
           ? evaluation.requirements
             ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
             : `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
-          : evaluation || currentBoardConfig.unverifiedRareThresholds
+          : evaluation || config.unverifiedRareThresholds
             ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
             : `${threshold.name}: not evaluated`;
         const className = evaluation?.resolved
@@ -575,13 +609,13 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
         addText(list, "li", className, label);
       }
       thresholds.appendChild(list);
-      const thresholdNote = currentBoardConfig.unverifiedRareThresholds
+      const thresholdNote = config.unverifiedRareThresholds
         ? "This board’s Rare conditional amounts and requirements remain unverified."
-        : currentBoardConfig.observedRareThresholds
-          ? `Rare thresholds use total attributes and the observed equip-index-${currentBoardConfig.boardEquipIndex} requirements.`
-          : currentBoardKey === "board00"
+        : config.observedRareThresholds
+          ? `Rare thresholds use total attributes and the observed equip-index-${config.boardEquipIndex} requirements.`
+          : boardKey === "board00"
             ? "Only the in-game verified starting-board requirement is evaluated."
-            : currentBoardKey === "board03"
+            : boardKey === "board03"
               ? "Fervent thresholds use total attributes and the observed equip-index-3 requirements."
               : "Castle thresholds are evaluated only for the observed equip-index-1 context.";
       addText(
@@ -597,7 +631,10 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       addText(tooltip, "p", "tooltip-trait", `Legendary power: ${definition.passivePower.name} (effect unresolved)`);
     }
     if (definition.hasSocket) addText(tooltip, "p", "tooltip-trait", "Glyph socket");
-    if (definition.isGate) addText(tooltip, "p", "tooltip-trait", "Board gate");
+    if (definition.isGate) {
+      const direction = node.marker.dataset.gateDirection;
+      addText(tooltip, "p", "tooltip-trait", direction ? `Board gate · ${direction}` : "Board gate");
+    }
   }
 
   function positionTooltip(marker) {
@@ -615,9 +652,10 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     tooltip.style.top = `${top}px`;
   }
 
-  function showTooltip(marker, definition) {
+  function showTooltip(node) {
+    const marker = node.marker;
     activeTooltipMarker = marker;
-    buildTooltip(definition, Number(marker.dataset.nodeIndex));
+    buildTooltip(node);
     tooltip.hidden = false;
     tooltip.setAttribute("aria-hidden", "false");
     requestAnimationFrame(() => positionTooltip(marker));
@@ -640,7 +678,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   }
 
   function setZoom(nextZoom) {
-    zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
+    const minimum = isConnectedMode() ? 0.1 : MIN_ZOOM;
+    zoom = Math.max(minimum, Math.min(MAX_ZOOM, nextZoom));
     applyTransform();
   }
 
@@ -701,6 +740,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     } else if (startingNodes.length !== 1) {
       throw new Error(`Expected exactly one starting node; found ${startingNodes.length}.`);
     }
+    // A quarter turn preserves orthogonal adjacency. Keep the graph in source indices.
     const nextGraph = new Map();
     for (const node of nextBoardNodes.values()) {
       const neighbors = [];
@@ -715,6 +755,9 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     allocationGraph = nextGraph;
     currentBoardKey = boardKey;
     currentBoardConfig = config;
+    attachmentPanel.hidden = true;
+    connectedToggle.setAttribute("aria-pressed", "false");
+    boardRotation = 0;
     allocationRootId = config.requiresEntryGate ? null : startingNodes[0].id;
     allocatedNodeIds = allocationRootId === null ? new Set() : new Set([allocationRootId]);
     boardIdentity = {
@@ -733,100 +776,276 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     exportBuildButton.title = buildActionTitle;
     importBuildButton.title = buildActionTitle;
 
-    boardSize = width * CELL_SIZE;
-    const grid = document.createElement("div");
-    grid.className = "board-grid";
-    grid.setAttribute("role", "grid");
-    grid.setAttribute("aria-label", `Paragon board, ${width} by ${width}`);
-    grid.style.gridTemplateColumns = `repeat(${width}, var(--cell-size))`;
-
-    const connections = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    connections.classList.add("board-connections");
-    connections.setAttribute("width", String(boardSize));
-    connections.setAttribute("height", String(boardSize));
-    connections.setAttribute("viewBox", `0 0 ${boardSize} ${boardSize}`);
-    connections.setAttribute("aria-hidden", "true");
-
-    const allocatedConnections = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    allocatedConnections.classList.add("board-connections", "board-connections--allocated");
-    allocatedConnections.setAttribute("width", String(boardSize));
-    allocatedConnections.setAttribute("height", String(boardSize));
-    allocatedConnections.setAttribute("viewBox", `0 0 ${boardSize} ${boardSize}`);
-    allocatedConnections.setAttribute("aria-hidden", "true");
-    allocatedConnectionLayer = allocatedConnections;
-
-    const entries = board.arEntries;
-    for (let index = 0; index < width * width; index += 1) {
-      const node = entries[index];
-      const cell = document.createElement("div");
-      cell.className = "board-cell";
-      cell.setAttribute("role", "gridcell");
-
-      if (node && typeof node.name === "string") {
-        const x = index % width;
-        const y = Math.floor(index / width);
-        const definition = nodeDefinitions.get(node.name);
-        const marker = document.createElement("span");
-        marker.className = `node node--${definition.kind}`;
-        marker.dataset.nodeIndex = String(index);
-        marker.dataset.nodeName = node.name;
-        marker.setAttribute("role", "button");
-        marker.setAttribute("aria-label", `${node.name}, ${KIND_LABELS[definition.kind] || "node"}`);
-        marker.setAttribute("aria-describedby", tooltip.id);
-        marker.setAttribute("aria-pressed", "false");
-        marker.tabIndex = 0;
-        boardNodes.get(index).marker = marker;
-        cell.setAttribute("aria-label", node.name);
-        marker.addEventListener("click", (event) => {
-          event.stopPropagation();
-          if (event.button !== 0) return;
-          allocateNode(index);
-        });
-        marker.addEventListener("contextmenu", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          refundNode(index);
-        });
-        marker.addEventListener("keydown", (event) => {
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          event.stopPropagation();
-          allocateNode(index);
-        });
-        marker.addEventListener("pointerenter", () => showTooltip(marker, definition));
-        marker.addEventListener("pointerleave", () => {
-          if (document.activeElement !== marker) hideTooltip(marker);
-        });
-        marker.addEventListener("focus", () => showTooltip(marker, definition));
-        marker.addEventListener("blur", () => {
-          if (!marker.matches(":hover")) hideTooltip(marker);
-        });
-
-        if (x + 1 < width && nextGraph.get(index).includes(index + 1)) {
-          addConnection(connections, x, y, x + 1, y);
-        }
-        if (y + 1 < width && nextGraph.get(index).includes(index + width)) {
-          addConnection(connections, x, y, x, y + 1);
-        }
-        cell.appendChild(marker);
-      } else {
-        cell.setAttribute("aria-label", "Empty");
-      }
-
-      grid.appendChild(cell);
-    }
-
-    grid.prepend(allocatedConnections);
-    grid.prepend(connections);
+    const grid = createBoardGrid(width, width, `Paragon board, ${width} by ${width}`);
+    boardCells = Array.from({ length: width * width }, (_, index) => createBoardCell(boardNodes.get(index)));
     frame.replaceChildren(grid);
-    setStatus(`${config.label} · ${width} × ${width} · ${entries.slice(0, width * width).filter(Boolean).length} occupied nodes · ${nodeDefinitions.size} definitions`);
-    updateAllocationDisplay();
+    setStatus(`${config.label} · ${width} × ${width} · ${boardNodes.size} occupied nodes · ${nodeDefinitions.size} definitions`);
     restoreSavedAllocation();
+    rotationLabel.hidden = !config.requiresEntryGate;
+    renderBoardOrientation();
+    updateAllocationDisplay();
 
+    fitBoardView();
+  }
+
+  function fitBoardView() {
     const availableWidth = Math.max(100, stage.clientWidth - 48);
     const availableHeight = Math.max(100, stage.clientHeight - 48);
-    zoom = Math.min(1, availableWidth / boardSize, availableHeight / boardSize);
+    zoom = Math.min(1, availableWidth / boardPixelWidth, availableHeight / boardPixelHeight);
     applyTransform();
+  }
+
+  function setConnectedLocation(active) {
+    if (active) {
+      window.history.replaceState(null, "", "#connected");
+    } else if (window.location.hash === "#connected") {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }
+
+  function updateAttachmentControls() {
+    startingGateSelect.value = String(connectedAttachment.startingGateIndex);
+    castleEntrySelect.value = String(connectedAttachment.castleEntryIndex);
+    castleRotationSelect.value = String(connectedAttachment.castleRotation);
+  }
+
+  function renderConnectedLayout() {
+    const { width, height, nodes, graph, root, boards } = connectedLayout;
+    hideTooltip();
+    currentBoardKey = "connected";
+    currentBoardConfig = CONNECTED_CONFIG;
+    currentBoardDefinition = null;
+    currentNodeDatabase = null;
+    boardNodes = nodes;
+    allocationGraph = graph;
+    allocationRootId = root;
+    allocatedNodeIds = connectedAllocation;
+    rotationLabel.hidden = true;
+    attachmentPanel.hidden = false;
+    connectedToggle.setAttribute("aria-pressed", "true");
+    exportBuildButton.disabled = true;
+    importBuildButton.disabled = true;
+    exportBuildButton.title = importBuildButton.title = "Build files are available in the Starting Board view.";
+    calculationScopeNote.textContent = CONNECTED_CONFIG.calculationScope;
+    updateAttachmentControls();
+
+    const grid = createBoardGrid(width, height, "Connected Starting Board and Castle");
+    const displayedNodes = new Map([...nodes.values()].map(node => {
+      const { x, y } = node.displayPosition;
+      return [y * width + x, node];
+    }));
+    for (const board of boards) {
+      const label = addText(grid, "span", "connected-board-label", BOARD_CONFIGS[board.id].label);
+      label.style.left = `${board.origin.x * CELL_SIZE}px`;
+      label.style.top = `${board.origin.y * CELL_SIZE}px`;
+    }
+    grid.append(...Array.from({ length: width * height }, (_, index) => createBoardCell(displayedNodes.get(index))));
+    frame.replaceChildren(grid);
+    renderConnections(connectionLayer, boardNodes);
+    setStatus(CONNECTED_CONFIG.label);
+    updateAllocationDisplay();
+  }
+
+  function openConnectedMode() {
+    let restoreError;
+    let restoredFromStorage = false;
+    if (!connectedLayout) {
+      try {
+        const serialized = window.localStorage.getItem(CONNECTED_SAVE_KEY);
+        if (serialized !== null) {
+          const restored = readConnectedSave(boardResources, JSON.parse(serialized));
+          connectedLayout = restored.layout;
+          connectedAttachment = restored.attachment;
+          connectedAllocation = restored.allocated;
+          restoredFromStorage = true;
+        }
+      } catch (error) {
+        restoreError = error;
+      }
+      if (!connectedLayout) {
+        connectedAttachment = DEFAULT_ATTACHMENT;
+        connectedLayout = buildConnectedLayout(boardResources, connectedAttachment);
+        connectedAllocation = new Set([connectedLayout.root]);
+      }
+    }
+    const populateGates = (select, boardId) => {
+      const gates = getAttachmentGates(boardResources.get(boardId).board);
+      select.replaceChildren(...gates.map(gate => new Option(gate.direction, String(gate.sourceIndex))));
+    };
+    populateGates(startingGateSelect, "board00");
+    populateGates(castleEntrySelect, "board01");
+    panX = panY = 0;
+    renderConnectedLayout();
+    fitBoardView();
+    setConnectedLocation(true);
+    if (restoreError) {
+      setSaveStatus("Connected save unavailable", "error");
+      setAllocationMessage(`Connected save could not be restored: ${restoreError.message}`, true);
+    } else {
+      setSaveStatus(restoredFromStorage ? "Connected draft restored" : "Separate connected draft", restoredFromStorage ? "saved" : "unsaved");
+      setAllocationMessage(allocatedNodeIds.has(connectedLayout.bridge[1])
+        ? "Castle is connected to the Starting Board."
+        : "Allocate a path from the starting node to the north gate to reach Castle.");
+    }
+  }
+
+  function saveConnectedAllocation(change) {
+    connectedAllocation = allocatedNodeIds;
+    try {
+      const saved = writeConnectedSave(connectedLayout, connectedAttachment, connectedAllocation);
+      window.localStorage.setItem(CONNECTED_SAVE_KEY, JSON.stringify(saved));
+    } catch (error) {
+      setSaveStatus("Connected save failed", "error");
+      setAllocationMessage(`${change} changed, but the connected draft could not be saved: ${error.message}`, true);
+      return false;
+    }
+    setSaveStatus("Connected draft saved locally", "saved");
+    return true;
+  }
+
+  function changeAttachment(event) {
+    if (!isConnectedMode()) return;
+    let proposed;
+    let layout;
+    try {
+      const startingGateIndex = Number(startingGateSelect.value);
+      // The pinned Starting Board has one north gate, so Castle must face south.
+      const facingGates = rotation => getAttachmentGates(boardResources.get("board01").board, rotation)
+        .filter(gate => gate.direction === "South");
+      let castleRotation = Number(castleRotationSelect.value);
+      let castleEntryIndex = Number(castleEntrySelect.value);
+      if (event.target === castleEntrySelect) {
+        castleRotation = BOARD_ROTATIONS.find(rotation => facingGates(rotation)
+          .some(gate => gate.sourceIndex === castleEntryIndex));
+      } else {
+        castleEntryIndex = facingGates(castleRotation)[0]?.sourceIndex;
+      }
+      proposed = { startingGateIndex, castleEntryIndex, castleRotation };
+      layout = buildConnectedLayout(boardResources, proposed);
+      validateConnectedAllocation(layout, allocatedNodeIds);
+    } catch (error) {
+      updateAttachmentControls();
+      setAllocationMessage(`Attachment change rejected: ${error.message}`, true);
+      return;
+    }
+    connectedAttachment = proposed;
+    connectedLayout = layout;
+    renderConnectedLayout();
+    applyTransform();
+    if (saveAllocation("Attachment")) setAllocationMessage("Attachment updated. Allocated nodes were preserved.");
+  }
+
+  function createBoardGrid(width, height, label) {
+    boardPixelWidth = width * CELL_SIZE;
+    boardPixelHeight = height * CELL_SIZE;
+    const grid = document.createElement("div");
+    boardGrid = grid;
+    grid.className = "board-grid";
+    grid.setAttribute("role", "grid");
+    grid.setAttribute("aria-label", label);
+    grid.style.gridTemplateColumns = `repeat(${width}, var(--cell-size))`;
+
+    function makeLayer(allocated) {
+      const layer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      layer.classList.add("board-connections");
+      if (allocated) layer.classList.add("board-connections--allocated");
+      layer.setAttribute("width", String(boardPixelWidth));
+      layer.setAttribute("height", String(boardPixelHeight));
+      layer.setAttribute("viewBox", `0 0 ${boardPixelWidth} ${boardPixelHeight}`);
+      layer.setAttribute("aria-hidden", "true");
+      grid.appendChild(layer);
+      return layer;
+    }
+
+    connectionLayer = makeLayer(false);
+    allocatedConnectionLayer = makeLayer(true);
+    return grid;
+  }
+
+  function createBoardCell(node) {
+    const cell = document.createElement("div");
+    cell.className = "board-cell";
+    cell.setAttribute("role", "gridcell");
+    if (!node) {
+      cell.setAttribute("aria-label", "Empty");
+      return cell;
+    }
+
+    const { id, definition, boardId } = node;
+    const marker = document.createElement("span");
+    marker.className = `node node--${definition.kind}`;
+    marker.dataset.nodeIndex = String(node.sourceIndex ?? id);
+    marker.dataset.nodeName = definition.name;
+    if (boardId) marker.dataset.boardId = boardId;
+    if (node.gateDirection) marker.dataset.gateDirection = node.gateDirection;
+    marker.setAttribute("role", "button");
+    marker.setAttribute("aria-describedby", tooltip.id);
+    marker.setAttribute("aria-pressed", "false");
+    marker.tabIndex = 0;
+    node.marker = marker;
+    cell.setAttribute("aria-label", definition.name);
+    marker.addEventListener("click", event => {
+      event.stopPropagation();
+      if (event.button === 0) allocateNode(id);
+    });
+    marker.addEventListener("contextmenu", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      refundNode(id);
+    });
+    marker.addEventListener("keydown", event => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+      allocateNode(id);
+    });
+    marker.addEventListener("pointerenter", () => showTooltip(node));
+    marker.addEventListener("pointerleave", () => {
+      if (document.activeElement !== marker) hideTooltip(marker);
+    });
+    marker.addEventListener("focus", () => showTooltip(node));
+    marker.addEventListener("blur", () => {
+      if (!marker.matches(":hover")) hideTooltip(marker);
+    });
+    cell.appendChild(marker);
+    return cell;
+  }
+
+  function renderBoardOrientation() {
+    const width = Number(currentBoardDefinition.nWidth);
+    const cells = [];
+    for (const [index, cell] of boardCells.entries()) {
+      const position = rotateBoardPoint(index % width, Math.floor(index / width), width, boardRotation);
+      const { x, y } = position;
+      cells[y * width + x] = cell;
+      const node = boardNodes.get(index);
+      if (!node) continue;
+      node.displayPosition = position;
+      if (node.definition.isGate) {
+        const direction = y === 0 ? "North" : x === width - 1 ? "East" : y === width - 1 ? "South" : x === 0 ? "West" : "";
+        node.marker.dataset.gateDirection = direction;
+      }
+    }
+    const focusedMarker = boardGrid.contains(document.activeElement) ? document.activeElement : null;
+    boardGrid.append(...cells);
+    focusedMarker?.focus({ preventScroll: true });
+    rotationSelect.value = String(boardRotation);
+    renderConnections(connectionLayer, boardNodes);
+  }
+
+  function renderConnections(layer, nodeIds) {
+    layer.replaceChildren();
+    for (const id of nodeIds.keys()) {
+      const from = boardNodes.get(id).displayPosition;
+      for (const neighborId of allocationGraph.get(id)) {
+        if (neighborId <= id || !nodeIds.has(neighborId)) continue;
+        const to = boardNodes.get(neighborId).displayPosition;
+        const line = addConnection(layer, from.x, from.y, to.x, to.y);
+        if (isConnectedMode() && boardNodes.get(id).boardId !== boardNodes.get(neighborId).boardId) {
+          line.classList.add("board-connection--bridge");
+        }
+      }
+    }
   }
 
   function addConnection(svg, x1, y1, x2, y2) {
@@ -836,6 +1055,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     line.setAttribute("x2", String(x2 * CELL_SIZE + CELL_SIZE / 2));
     line.setAttribute("y2", String(y2 * CELL_SIZE + CELL_SIZE / 2));
     svg.appendChild(line);
+    return line;
   }
 
   function getEligibleNodeIds() {
@@ -902,7 +1122,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       try {
         allocationRootId = memoryAllocation.rootId;
         allocatedNodeIds = validateAllocatedNodeIndices(memoryAllocation.indices, allocationRootId);
-        updateAllocationDisplay();
+        boardRotation = memoryAllocation.rotation;
         setSaveStatus("Saved locally", "saved");
         setAllocationMessage(currentBoardConfig.requiresEntryGate
           ? "Restored this board's independent allocation."
@@ -925,9 +1145,9 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     if (serialized === null) {
       setSaveStatus("Not saved yet", "unsaved");
       setAllocationMessage(currentBoardConfig.requiresEntryGate
-        ? "Choose a gate as this board's local entry anchor. Board attachment and rotation are not modeled."
+        ? "Choose a gate as this board's local entry anchor."
         : "Starting node is active.");
-      allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices: [...allocatedNodeIds] });
+      allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices: [...allocatedNodeIds], rotation: boardRotation });
       return;
     }
 
@@ -949,36 +1169,36 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
           allocationRootId = parsed.entryNodeIndex;
         }
         restored = validateAllocatedNodeIndices(parsed.allocatedNodeIndices, allocationRootId);
+        if (BOARD_ROTATIONS.includes(parsed.rotation)) boardRotation = parsed.rotation;
       } else {
         restored = validateAllocatedNodeIndices(parsed, allocationRootId);
       }
     } catch (error) {
       allocationRootId = currentBoardConfig.requiresEntryGate ? null : allocationRootId;
       allocatedNodeIds = allocationRootId === null ? new Set() : new Set([allocationRootId]);
-      updateAllocationDisplay();
       setSaveStatus("Invalid save rejected", "error");
       setAllocationMessage(`Saved allocation rejected; starting node only. ${error.message}`, true);
       return;
     }
 
     allocatedNodeIds = restored;
-    allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices: [...allocatedNodeIds] });
-    updateAllocationDisplay();
+    allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices: [...allocatedNodeIds], rotation: boardRotation });
     setSaveStatus("Saved locally", "saved");
     setAllocationMessage("Restored saved allocation.");
   }
 
-  function saveAllocation() {
+  function saveAllocation(change = "Allocation") {
+    if (isConnectedMode()) return saveConnectedAllocation(change);
     const indices = [...allocatedNodeIds].sort((a, b) => a - b);
-    allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices });
+    allocationsByBoard.set(currentBoardKey, { rootId: allocationRootId, indices, rotation: boardRotation });
     const persistedValue = currentBoardConfig.requiresEntryGate
-      ? { entryNodeIndex: allocationRootId, allocatedNodeIndices: indices }
+      ? { entryNodeIndex: allocationRootId, allocatedNodeIndices: indices, rotation: boardRotation }
       : indices;
     try {
       window.localStorage.setItem(currentBoardConfig.storageKey, JSON.stringify(persistedValue));
     } catch (error) {
       setSaveStatus("Save failed", "error");
-      setAllocationMessage(`Allocation changed, but could not be saved: ${error.message}`, true);
+      setAllocationMessage(`${change} changed, but could not be saved: ${error.message}`, true);
       return false;
     }
     setSaveStatus("Saved locally", "saved");
@@ -1174,32 +1394,27 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       node.marker.classList.toggle("node--eligible", isEligible);
       node.marker.setAttribute("aria-pressed", String(isAllocated));
       const state = isAllocated ? "allocated" : isEligible ? "eligible to allocate" : "not connected to the allocated path";
-      node.marker.setAttribute("aria-label", `${node.definition.name}, ${KIND_LABELS[node.definition.kind] || "node"}, ${state}`);
+      const boardLabel = node.boardId ? `${BOARD_CONFIGS[node.boardId].label}, ` : "";
+      node.marker.setAttribute("aria-label", `${boardLabel}${node.definition.name}, ${KIND_LABELS[node.definition.kind] || "node"}, ${state}`);
     }
 
     pointsSpent.textContent = String(spent);
     allocatedCount.textContent = String(allocatedNodeIds.size);
     updateParagonCalculation();
-    allocatedConnectionLayer.replaceChildren();
-    for (const id of allocatedNodeIds) {
-      const node = boardNodes.get(id);
-      for (const neighborId of allocationGraph.get(id) || []) {
-        if (neighborId <= id || !allocatedNodeIds.has(neighborId)) continue;
-        const neighbor = boardNodes.get(neighborId);
-        addConnection(allocatedConnectionLayer, node.x, node.y, neighbor.x, neighbor.y);
-      }
-    }
+    renderConnections(allocatedConnectionLayer, allocatedNodeIds);
   }
 
   function updateParagonCalculation() {
-    if (!currentBoardDefinition || !currentNodeDatabase) return;
-    const result = calculateParagonBonuses(
-      currentBoardDefinition,
-      currentNodeDatabase,
-      allocatedNodeIds,
-      externalAttributes,
-      { boardEquipIndex: currentBoardConfig.boardEquipIndex }
-    );
+    if (!isConnectedMode() && (!currentBoardDefinition || !currentNodeDatabase)) return;
+    const result = isConnectedMode()
+      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes)
+      : calculateParagonBonuses(
+        currentBoardDefinition,
+        currentNodeDatabase,
+        allocatedNodeIds,
+        externalAttributes,
+        { boardEquipIndex: currentBoardConfig.boardEquipIndex }
+      );
     currentCalculation = result;
     const attributes = result.verifiedParagonBonuses.coreAttributes;
     strengthTotal.textContent = `+${attributes.Strength}`;
@@ -1229,8 +1444,9 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     renderStatsSidebar(result);
 
     if (activeTooltipMarker) {
-      const node = boardNodes.get(Number(activeTooltipMarker.dataset.nodeIndex));
-      if (node) showTooltip(activeTooltipMarker, node.definition);
+      const { boardId, nodeIndex } = activeTooltipMarker.dataset;
+      const node = boardNodes.get(boardId ? `${boardId}:${nodeIndex}` : Number(nodeIndex));
+      if (node) showTooltip(node);
     }
   }
 
@@ -1280,10 +1496,10 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
           : attribute.category ? `raw:${attribute.category}` : null;
         if (!key) continue;
         if (Number.isFinite(attribute.unconditional) && attribute.unconditional !== 0) {
-          addStatContribution(contributors, key, node.nodeIndex, false);
+          addStatContribution(contributors, key, node.nodeId ?? node.nodeIndex, false);
         }
         if (attribute.conditional > 0 && attribute.conditionalApplied) {
-          addStatContribution(contributors, key, node.nodeIndex, true);
+          addStatContribution(contributors, key, node.nodeId ?? node.nodeIndex, true);
         }
       }
     }
@@ -1386,6 +1602,16 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     }
   }
 
+  connectedToggle.addEventListener("click", () => {
+    if (isConnectedMode()) {
+      boardSelector.dispatchEvent(new Event("change"));
+    } else {
+      openConnectedMode();
+    }
+  });
+  for (const control of [startingGateSelect, castleEntrySelect, castleRotationSelect]) {
+    control.addEventListener("change", changeAttachment);
+  }
   allocationResetButton.addEventListener("click", resetAllocation);
   exportBuildButton.addEventListener("click", exportBuild);
   importBuildButton.addEventListener("click", () => buildFileInput.click());
@@ -1405,11 +1631,25 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     panX = 0;
     panY = 0;
     try {
+      if (isConnectedMode()) setConnectedLocation(false);
       renderBoard(boardKey, resource.board, resource.database);
     } catch (error) {
       console.error("Could not switch Paragon boards:", error);
       setStatus(`Could not render selected board. (${error.message})`, true);
     }
+  });
+  rotationSelect.addEventListener("change", () => {
+    if (!currentBoardConfig.requiresEntryGate) {
+      rotationSelect.value = "0";
+      return;
+    }
+    const rotation = Number(rotationSelect.value);
+    if (!BOARD_ROTATIONS.includes(rotation) || rotation === boardRotation) return;
+    boardRotation = rotation;
+    hideTooltip();
+    renderBoardOrientation();
+    renderConnections(allocatedConnectionLayer, allocatedNodeIds);
+    saveAllocation("Rotation");
   });
   for (const input of Object.values(externalAttributeInputs)) {
     input.addEventListener("input", updateExternalAttributesFromInputs);
@@ -1421,7 +1661,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   resetButton.addEventListener("click", () => {
     panX = 0;
     panY = 0;
-    zoom = Math.min(1, (stage.clientWidth - 48) / boardSize, (stage.clientHeight - 48) / boardSize);
+    zoom = Math.min(1, (stage.clientWidth - 48) / boardPixelWidth, (stage.clientHeight - 48) / boardPixelHeight);
     applyTransform();
   });
 
@@ -1487,6 +1727,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardResources.set("board01", additionalBoard);
       const board01Option = boardSelector.querySelector('option[value="board01"]');
       if (board01Option) board01Option.disabled = false;
+      connectedToggle.disabled = false;
+      if (window.location.hash === "#connected") openConnectedMode();
     } catch (error) {
       console.error("Could not load the Castle board:", error);
       setAllocationMessage(`Board 00 is available, but Board 01 could not be loaded. (${error.message})`, true);

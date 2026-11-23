@@ -50,7 +50,7 @@ Board 03 keeps board-specific definitions for Magic Armor Percent, All Resistanc
 
 ## Implemented and verified functionality
 
-All ten boards render at their source coordinates and share the established node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations.
+All ten boards share node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations and rotations.
 
 External attributes remain editable and locally persisted above the board. Verified and total-threshold breakdowns, raw bonuses, unresolved diagnostics, and provenance are retained in a closed-by-default **Advanced Calculation Details** section. The detailed raw-bonus view includes flat Thorns with Base / Conditional / Total values and no percent suffix.
 
@@ -114,7 +114,7 @@ Threshold evaluation uses total character attributes: external inputs plus verif
 | Surgical · `Paladin_Rare_018` · `2449765` | +15% Critical Strike Damage, +4 Maximum Faith | +4 Maximum Faith at 1,345 Strength | `StrengthMain3` |
 | Skirmish · `Paladin_Rare_017` · `2449763` | +2% Total Armor, +10% Physical Damage | +10% Physical Damage at 1,155 Strength AND 260 Willpower | `Paladin_Strength+Willpower` |
 
-Fervent displays Critical Strike Damage as a percentage and Maximum Faith as a flat value. Tooltips display threshold progress, and the raw bonus breakdown shows base and active conditional amounts separately. The Legendary power remains unresolved. Glyphs, rotation, attachment, and multi-board aggregation are outside this implementation.
+Fervent displays Critical Strike Damage as a percentage and Maximum Faith as a flat value. Tooltips display threshold progress, and the raw bonus breakdown shows base and active conditional amounts separately. The Legendary power remains unresolved. Fervent is available in the single-board viewer.
 
 ### Boards 04–06 — Preacher, Divinity, and Relentless
 
@@ -233,9 +233,31 @@ Before the direct observation, Beacon used a formula-derived +1.5% for `679347`.
 
 The Legendary power on each board remains unresolved.
 
+### Board rotation
+
+The Rotation selector beside the board selector offers 0°, 90°, 180°, and 270° clockwise on Boards 01–09. Board 00 is fixed at 0°. A rotation takes effect immediately and preserves the current zoom, pan, allocated source indices, and source gate anchor.
+
+`paragon-visual/board-rotation.js` exposes the pure `rotateBoardPoint(x, y, width, rotation)` transform. The viewer moves the existing cells into rotated row-major order, projects both SVG connection layers onto those cells, and derives each gate's displayed compass direction from its rotated edge. Input handlers and tooltips retain the original source indices. The graph stays in source coordinates because quarter turns preserve orthogonal adjacency. The calculator still receives the pinned board data, source-index allocation set, and the board's existing equip context.
+
+Single-board entry anchors serve only their board's internal allocation graph. The Connected Boards prototype uses a separate draft and a root on the Starting Board.
+
+### Connected Boards prototype
+
+Select **Connected Boards** to open Starting Board and Castle on one canvas. Starting Board stays fixed. Castle sits above it, with a single bridge at the seam. Castle's rotation control selects the facing source gate. Choosing a Castle source gate sets the rotation that brings it to the seam.
+
+The pinned Starting Board has one `Generic_Gate` at source index `10`, coordinate `(10, 0)`. Its actual starting node is at index `304`. Castle has gates at source indices `10`, `210`, `230`, and `430` and no starting node. At Castle angles 0°, 90°, 180°, and 270°, its facing gate uses indices `430`, `230`, `10`, and `210` respectively. The shared gate definition has `bIsGate` and four core-stat slots verified at +5 each. The pinned assets contain no attachment graph, entry-selection rule, automatic allocation flag, or gate costs. [Pinned Starting Board](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonBoard/Paragon_Paladin_00.pbd.json), [Pinned Castle](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonBoard/Paragon_Paladin_01.pbd.json), [Pinned gate definition](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonNode/Generic_Gate.pgn.json)
+
+Blizzard's 2021 design overview describes unlocking a gate to attach another board and optionally rotating it. It gives historical context while leaving the pinned revision's exact attachment and entry purchase rules open. The prototype permits layout preview before allocation and models facing gates one grid step apart. Both gates require explicit allocation and cost one point each. Starting's actual starting node is free. East, south, and west attachments from Starting are unavailable because it has no gates there. [Blizzard's Paragon design overview](https://news.blizzard.com/en-gb/article/23746639/diablo-iv-quarterly-updatedecember-2021)
+
+`connected-boards.js` builds the graph in `(boardId, sourceNodeIndex)` identities. Each board contributes its internal orthogonal edges. The selected gate pair adds the sole cross-board edge. Allocations must be reachable from `(board00, 304)` within the allocated subgraph. Choosing a gate or angle grants no nodes. After the Starting gate is allocated, Castle's facing gate becomes eligible. Refunds and attachment changes that would disconnect existing allocations are rejected. A rotation can change the source gate at the seam after Castle is allocated if the new entry already connects the allocated Castle path to Starting.
+
+The connected calculator first collects unconditional core gains from both boards with the existing calculator. It then evaluates each board's thresholds with external attributes plus the other board's core gains, and sums the resulting Paragon-only bonuses once. Starting stays at equip index 0 and Castle at 1. The wrapper rejects conditional core gains because they would require a different threshold evaluation strategy. The draft supports these two boards and their verified equip contexts. Glyph effects, Legendary powers, and other board orders remain outside its calculation.
+
 ## Important files
 
 - `paragon-visual/index.html`, `style.css`, `app.js` — UI, rendering, interaction, persistence.
+- `paragon-visual/board-rotation.js` — pure clockwise coordinate transform.
+- `paragon-visual/connected-boards.js` — attachment geometry, global graph, draft validation, and two-pass calculation.
 - `paragon-visual/paragon-calculator.js` — calculation and unresolved-bonus engine.
 - `paragon-visual/paragon-bonus-registry.js` — revision/board/SNO-scoped numerical evidence.
 - `paragon-visual/shared-node-definitions.js` — authoritative pinned reusable Normal, compatible Magic, and verified Gate definitions with per-board applicability and merge validation.
@@ -250,20 +272,17 @@ The Legendary power on each board remains unresolved.
 ## Persistence and compatibility
 
 - Board 00 uses local-storage key `d4-paragon-paladin-00-v1`; its value remains the legacy array of allocated indices.
-- Board 01 uses `d4-paragon-paladin-01-v1`; its value contains `entryNodeIndex` and `allocatedNodeIndices`.
-- Board 02 uses `d4-paragon-paladin-02-v1`; its value contains `entryNodeIndex` and `allocatedNodeIndices`.
-- Board 03 uses `d4-paragon-paladin-03-v1`. Its value contains `entryNodeIndex` and `allocatedNodeIndices`.
-- Boards 04–06 use their own `d4-paragon-paladin-04-v1`, `d4-paragon-paladin-05-v1`, and `d4-paragon-paladin-06-v1` keys with the same gate and allocation fields.
-- Boards 07–09 use `d4-paragon-paladin-07-v1`, `d4-paragon-paladin-08-v1`, and `d4-paragon-paladin-09-v1` with the same gate and allocation fields.
+- Boards 01–09 keep their independent `d4-paragon-paladin-01-v1` through `d4-paragon-paladin-09-v1` keys. Each save contains the source-index fields `entryNodeIndex` and `allocatedNodeIndices` plus `rotation` in clockwise degrees. Saves with a missing or unsupported rotation load at 0° and retain their valid allocations. Reset Allocation preserves rotation.
 - External attributes use `d4-paragon-paladin-00-external-attributes-v1` and are shared by the calculator view.
 - Build-file import/export remains **Board 00 only**, schema version 1. Boards 01–09 disable these buttons.
+- Connected Boards uses `d4-paragon-paladin-connected-v1` with `version: 1`, `sourceRevision`, an `attachment` object containing `startingGateIndex`, `castleEntryIndex`, and `castleRotation`, and `allocations` as pairs of board ID and source index. The `#connected` address opens the draft on reload. Single-board allocation keys and build files remain separate. The existing external attribute inputs are shared between modes.
 
 ## Known limitations
 
-- No glyph effects, Legendary power calculation, board rotation, or board attachment.
+- No glyph effects or Legendary power calculation.
 - Castle Rare numbers/requirements are verified only for equip index 1; other placements remain unresolved.
 - Formula-derived Castle Magic outputs are not all direct Castle tooltip observations, and power-budget intrinsic values must not be generalized beyond documented evidence.
-- Boards are not connected; the Castle gate anchor does not assert a legal in-game attachment.
+- Attachment is experimental and limited to Starting Board and Castle. Single-board gate anchors remain local.
 - Totals cover registered Paragon bonuses, not a complete character sheet.
 - No live visual browser pass has been completed for the final Board 01 calculation state.
 
@@ -311,6 +330,14 @@ Headless Chrome verified all six Beacon Rare threshold transitions and refunds, 
 
 After the direct `679347` observation, all 32 Magic Armor allocation combinations passed again. The 6,681 calculator comparisons across Boards 00–09 showed only the expected provenance change. The full-grid audit checked every ordinary attribute and marked Rare conditional at zero and high external attributes and found zero unresolved ordinary numerical bonuses across all ten boards. Headless Chrome confirmed both Armor SNOs display their own identity and direct evidence, and that Beacon's Armor total restores after a reload.
 
+Rotation checks covered all 441 grid coordinates at each angle, four consecutive 90° turns, and 90° followed by 270°. Headless Chrome verified all 36 Board 01–09 orientations and 144 gate positions and directions, including both connection layers, source-node tooltip identity, pointer hit-testing, zoom retention, and allocation and refund connectivity. Old and invalid-angle saves restored their valid allocations, Board 00 retained its legacy save array, and all ten boards restored their allocations and orientations after reload.
+
+All 6,699 calculator comparisons across Boards 00–09 matched the pre-rotation baseline. The full-grid audit again found zero unresolved ordinary numerical bonuses in the supported equip contexts. The pinned board data, bonus registry, and calculator files were unchanged.
+
+Connected Boards validation checked all four Castle placements, rejected 24 unsupported gate pairs, and verified single-bridge geometry, source identities, disconnected and duplicate save rejection, and both gates' +5 core attributes per allocation. Seven combined threshold cases covered Starting Board's Brawn and Castle's two-attribute Knight requirement. All 6,699 single-board calculator comparisons and the full-grid ordinary-bonus audit passed again.
+
+Headless Chrome verified both boards on one zoomable and pannable canvas, all four Castle rotations, pointer selection at the rotated entry gate, one point per gate, threshold tooltips, blocked disconnecting refunds and rotations, and successful rotation with a reachable alternate entry and unchanged allocations and totals. Reload restored the bridge and draft at 90°. All ten single-board saves remained intact, and Board 00 import/export passed with schema version 1. The single-board suite also rechecked all 36 orientations and 144 gate positions and directions.
+
 ## Current boundary
 
-Boards 00–09 have complete ordinary numerical coverage in their supported equip contexts. Legendary powers and glyph effects remain deferred.
+Boards 00–09 have complete ordinary numerical coverage in their supported equip contexts. Boards 01–09 support local rotation. Connected Boards supports the Starting Board and Castle under the documented prototype assumptions. Other attachments, Legendary powers, and glyph effects remain deferred.

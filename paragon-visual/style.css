@@ -66,16 +66,61 @@ h1 {
   color: #e18d78;
 }
 
+.board-selectors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+}
+
 .board-selector-label {
   display: flex;
   align-items: center;
   gap: 8px;
   width: fit-content;
-  margin-top: 10px;
   color: #a9824c;
   font: 10px Arial, sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.board-selector-label[hidden] {
+  display: none;
+}
+
+.connected-mode-toggle[aria-pressed="true"] {
+  border-color: #b28c53;
+  color: #fff0cf;
+}
+
+.connected-controls {
+  padding: 14px 18px;
+  border-bottom: 1px solid #554632;
+}
+
+.connected-controls h2 {
+  margin: 0;
+  color: #e8dfcb;
+  font-size: 16px;
+}
+
+.connected-controls h2 span,
+.connected-controls p {
+  color: #ad9f85;
+  font: 12px/1.4 Arial, sans-serif;
+}
+
+.connected-controls p {
+  margin: 8px 0 0;
+}
+
+.connected-board-label {
+  position: absolute;
+  z-index: 2;
+  margin: 8px;
+  color: #c3a56f;
+  font: 15px Arial, sans-serif;
+  pointer-events: none;
 }
 
 .board-selector-label select {
@@ -710,6 +755,12 @@ button:disabled {
   stroke: #f04e39;
   stroke-width: 2.5;
   filter: drop-shadow(0 0 3px rgba(255, 75, 51, 0.9));
+}
+
+.board-connections:not(.board-connections--allocated) .board-connection--bridge {
+  stroke: #d4a65e;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 3;
 }
 
 .board-cell {
