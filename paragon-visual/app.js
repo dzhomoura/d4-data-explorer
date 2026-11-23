@@ -94,8 +94,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 7,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      unverifiedRareThresholds: true,
-      calculationScope: "Sentencing reuses verified values for matching nodes. Some Magic and Rare base bonuses, all Rare conditionals, and the Legendary power remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Sentencing resolves ordinary node bonuses and all six observed Rare thresholds at equip index 7. The Legendary power remains unresolved."
     }),
     board08: Object.freeze({
       label: "Board 08 — Endure",
@@ -105,8 +105,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 8,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      unverifiedRareThresholds: true,
-      calculationScope: "Endure reuses verified core formulas and matching Magic bonuses. Some Magic bonuses, all Rare bonuses, and the Legendary power remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Endure resolves ordinary node bonuses and the observed thresholds for all six Rare cells at equip index 8. The Legendary power remains unresolved."
     }),
     board09: Object.freeze({
       label: "Board 09 — Beacon",
@@ -116,8 +116,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 9,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      unverifiedRareThresholds: true,
-      calculationScope: "Beacon reuses verified values for matching nodes. Some Magic and Rare base bonuses, all Rare conditionals, and the Legendary power remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Beacon resolves ordinary node bonuses and all six observed Rare thresholds at equip index 9. The Legendary power remains unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -174,6 +174,24 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       conditional: document.getElementById("raw-physical-conditional"),
       total: document.getElementById("raw-physical-total")
     },
+    holyDamage: {
+      panel: document.getElementById("raw-holy-damage-panel"),
+      unconditional: document.getElementById("raw-holy-damage-base"),
+      conditional: document.getElementById("raw-holy-damage-conditional"),
+      total: document.getElementById("raw-holy-damage-total")
+    },
+    judgementDamage: {
+      panel: document.getElementById("raw-judgement-damage-panel"),
+      unconditional: document.getElementById("raw-judgement-damage-base"),
+      conditional: document.getElementById("raw-judgement-damage-conditional"),
+      total: document.getElementById("raw-judgement-damage-total")
+    },
+    luckyHitChance: {
+      panel: document.getElementById("raw-lucky-hit-panel"),
+      unconditional: document.getElementById("raw-lucky-hit-base"),
+      conditional: document.getElementById("raw-lucky-hit-conditional"),
+      total: document.getElementById("raw-lucky-hit-total")
+    },
     damageToCrowdControlled: {
       unconditional: document.getElementById("raw-cc-base"),
       conditional: document.getElementById("raw-cc-conditional"),
@@ -183,6 +201,12 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       unconditional: document.getElementById("raw-life-base"),
       conditional: document.getElementById("raw-life-conditional"),
       total: document.getElementById("raw-life-total")
+    },
+    lifePer5Seconds: {
+      panel: document.getElementById("raw-life-per-5-seconds-panel"),
+      unconditional: document.getElementById("raw-life-per-5-seconds-base"),
+      conditional: document.getElementById("raw-life-per-5-seconds-conditional"),
+      total: document.getElementById("raw-life-per-5-seconds-total")
     },
     totalArmorPercent: {
       unconditional: document.getElementById("raw-armor-base"),
@@ -303,6 +327,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     Attack_Speed_Percent_Bonus: "Attack Speed",
     Fortified_Health_Application_Bonus: "Fortify Generation",
     Bonus_Healing_Received_Percent: "Healing Received",
+    No_Damage_Taken_Flat_Hitpoints_Regen_Per_Second: "Life per 5 Seconds after taking no damage",
     Damage_Percent_Bonus_When_Fortified: "Damage while Fortified",
     Damage_Bonus_At_High_Health: "Damage while Healthy",
     Vulnerable_Health_Damage_Bonus: "Vulnerable Damage",
@@ -319,8 +344,12 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     damage: "Damage",
     damageToElites: "Damage to Elites",
     physicalDamage: "Physical Damage",
+    holyDamage: "Holy Damage",
+    judgementDamage: "Judgement Damage",
+    luckyHitChance: "Lucky Hit Chance",
     damageToCrowdControlled: "Damage to Crowd Controlled",
     maximumLifePercent: "Maximum Life",
+    lifePer5Seconds: "Life per 5 Seconds",
     totalArmorPercent: "Total Armor",
     allResistance: "Resistance to All Elements",
     blockChance: "Block Chance",
@@ -337,6 +366,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     cooldownReduction: "Cooldown Reduction",
     movementSpeed: "Movement Speed"
   });
+  const FLAT_BONUS_CATEGORIES = new Set(["thorns", "maximumFaith", "lifePer5Seconds"]);
   const KIND_LABELS = {
     normal: "Normal",
     magic: "Magic",
@@ -406,7 +436,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
 
   function formatBonusValue(value, category) {
     const sign = value > 0 ? "+" : "";
-    if (category === "coreAttribute" || category === "thorns" || category === "maximumFaith") return `${sign}${value}`;
+    if (category === "coreAttribute" || FLAT_BONUS_CATEGORIES.has(category)) return `${sign}${value}`;
     return `${sign}${Number.isInteger(value) ? value : Number(value.toFixed(2))}%`;
   }
 
@@ -1210,7 +1240,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   }
 
   function formatRawBonusValue(value, category) {
-    if (category === "thorns" || category === "maximumFaith") {
+    if (FLAT_BONUS_CATEGORIES.has(category)) {
       const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
       return `${value >= 0 ? "+" : ""}${rounded}`;
     }
@@ -1266,7 +1296,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     }
     for (const [category, totals] of Object.entries(result.verifiedParagonBonuses.rawBonuses)) {
       if (totals.total !== 0) {
-        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || category, value: totals.total, flat: category === "thorns" || category === "maximumFaith" });
+        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || category, value: totals.total, flat: FLAT_BONUS_CATEGORIES.has(category) });
       }
     }
     statsSidebarList.replaceChildren();

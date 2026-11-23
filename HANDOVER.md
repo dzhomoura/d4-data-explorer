@@ -11,9 +11,9 @@ This is a dependency-free browser viewer/calculator for Diablo IV Paladin Parago
 - **Board 04 — Preacher** (SNO `2438973`), with complete ordinary numerical bonuses at equip index 4
 - **Board 05 — Divinity** (SNO `2438992`), with complete ordinary numerical bonuses at equip index 5
 - **Board 06 — Relentless** (SNO `2439024`), with complete ordinary numerical bonuses at equip index 6
-- **Board 07 — Sentencing** (SNO `2439031`), with selected Magic bonuses and two Rare bases
-- **Board 08 — Endure** (SNO `2439033`), with selected Magic bonuses
-- **Board 09 — Beacon** (SNO `2439035`), with selected Magic bonuses and three Rare bases
+- **Board 07 — Sentencing** (SNO `2439031`), with complete ordinary numerical bonuses at equip index 7
+- **Board 08 — Endure** (SNO `2439033`), with complete ordinary numerical bonuses at equip index 8
+- **Board 09 — Beacon** (SNO `2439035`), with complete ordinary numerical bonuses at equip index 9
 
 `paragon-visual/app.js` loads board/node JSON, merges revision-pinned definitions from `shared-node-definitions.js` according to board SNO, renders the 21×21 grid, manages zoom/pan/tooltips and allocation connectivity, persists independent allocations, and passes allocated indices plus external attributes to the pure calculation module. `paragon-calculator.js` validates board/node identity and combines pinned core-stat formulas with board-scoped records from `paragon-bonus-registry.js`. Missing or mismatched numerical evidence is reported as unresolved rather than zero. The UI has a responsive, collapsible Paragon-only Total Stats sidebar beside the board; it derives totals and hover contributors from calculator node evaluations, excluding external attributes and inactive conditionals.
 
@@ -176,23 +176,60 @@ All three use the pinned formulas for Normal core stats (+5), Gates (+5 to each 
 | 07, 09 | All Resistance +1.5% (`678750`) | Castle formula-derived |
 | 07, 08 | Healing Received +3% (`1195913`) | Preacher direct in-game |
 | 07, 09 | Attack Speed +1.3% (`679060`) | Preacher direct in-game |
+| 08 | Lucky Hit Chance +1.3% (`1340824`) | Sentencing direct in-game |
 | 09 | Armor +1.5% (`671247`) | Board 00 direct in-game |
 | 09 | Block Chance +2% (`2063114`) | Castle formula-derived |
 | 09 | Critical Strike Damage +7.5% (`671242`), Maximum Faith +2 flat (`2525975`) | Fervent formula-derived Critical Strike Damage and direct in-game Faith |
 
-| Board | Unresolved Magic node types | Reused Rare bases from direct in-game evidence | Rare nodes with both base bonuses unresolved |
+#### Sentencing at equip index 7
+
+Direct, unamplified in-game observations resolve Magic Lucky Hit Chance at +1.3% (`1340824`) and Magic Judgement Damage at +5% (`2500772`). Each appears three times, for +3.9% Lucky Hit Chance and +15% Judgement Damage from those Magic cells. Holy Damage, Judgement Damage, and Lucky Hit Chance have separate percentage totals in the sidebar and raw-bonus details. The six prior Magic links remain in use.
+
+| Rare node / SNO | Base bonuses | Observed conditional and requirement | Pinned selector |
 |---|---|---|---|
-| 07 | Lucky Hit Chance (`1340824`), Judgement Damage (`2500772`) | Sturdy (`2449942`), +3% Armor and +4% Maximum Life from Fervent. Rare Endure (`2449913`), +3% All Resistance and +10 Strength from Relentless. | Benediction (`2449924`), Grace (`2449915`), Luminous (`2449918`), Restorative (`680037`) |
-| 08 | Lucky Hit Chance (`1340824`), Life Regeneration after taking no damage (`679136`) | None | Anointed (`2449931`), Grace (`2449915`), Radiance (`2449928`), Restorative (`680037`, two cells), Wrathful (`2449936`) |
-| 09 | Armor Percent (`679347`, internal name `Generic_Magic_DamageReductionFromElite`) | Champion (`2449940`), +10% Damage and +10 Strength from Divinity. Constitution (`2449944`), +3% All Resistance and +4% Maximum Life, and Sturdy (`2449942`), +3% Armor and +4% Maximum Life, from Fervent. | Blurring (`2449946`), Fortitude (`2449951`), Spiked Shield (`2449949`) |
+| Endure / `2449913` | +3% Resistance to All Elements, +10 Strength | +3% Resistance to All Elements at 305 Willpower | `WillPowerSide3` |
+| Grace / `2449915` | +2.5% Lucky Hit Chance, +10 Strength | +2.5% Lucky Hit Chance at 265 Willpower | `WillPowerSide1` |
+| Luminous / `2449918` | +10% Holy Damage, +1.3% Attack Speed | +10% Holy Damage at 265 Intelligence | `IntelligenceSide1` |
+| Sturdy / `2449942` | +3% Total Armor, +4% Maximum Life | +3% Total Armor at 265 Intelligence | `IntelligenceSide1` |
+| Restorative / `680037` | +4% Maximum Life, +6% Healing Received | +4% Maximum Life at 285 Willpower | `WillPowerSide2` |
+| Benediction / `2449924` | +17.5% Judgement Damage, +6% Healing Received | +17.5% Judgement Damage at 1,345 Strength | `StrengthMain3` |
 
-All six Rare conditional amounts and requirements on each board are unresolved. The following selectors and marked attributes are datamined.
+Endure and Sturdy keep their exact-node bases from Relentless and Fervent respectively. Their conditional amounts and requirements are recorded independently from Sentencing's direct in-game observations. All six conditionals apply to slot 0 and use external attributes plus verified allocated Paragon stats. Restorative also has an authored `IntelligenceSide2` selector. The observed Sentencing bonus uses only `WillPowerSide2`. Luminous uses `Damage_Type_Percent_Bonus` (254, parameter 6). Both Judgement nodes use `Power_Damage_Percent_Bonus` (984, parameter 2263340). Lucky Hit Chance uses `Combat_Effect_Chance_Bonus` (1207, parameter -1).
 
-| Board | Rare conditional slots and selectors |
-|---|---|
-| 07 | Benediction, Judgement Damage (`StrengthMain3`). Endure, All Resistance (`WillPowerSide3`). Grace, Lucky Hit Chance (`WillPowerSide1`). Luminous, damage type parameter 6 (`IntelligenceSide1`). Restorative, Maximum Life (`WillPowerSide2` and `IntelligenceSide2` are authored selectors). Sturdy, Armor (`IntelligenceSide1`). |
-| 08 | Anointed, Healing Received (`WillPowerSide1`). Grace, Lucky Hit Chance (`WillPowerSide1`). Radiance, damage type parameter 6 (`StrengthMain3`). Restorative, Maximum Life (`WillPowerSide2` and `IntelligenceSide2` are authored selectors). Wrathful, damage type parameter 6 (`WillPowerSide2`). |
-| 09 | Blurring, Critical Strike Damage (`StrengthMain1`). Champion, Damage (`WillPowerSide1`). Constitution, All Resistance (`StrengthMain1`). Fortitude, Maximum Faith (`IntelligenceSide1`). Spiked Shield, Block Chance (`WillPowerSide1`). Sturdy, Armor (`IntelligenceSide1`). |
+#### Endure at equip index 8
+
+Magic Life Regeneration after taking no damage (`Generic_Magic_HPRegen`, SNO `679136`) grants +107 Life per 5 Seconds per cell from a direct, unamplified in-game observation. The three cells at indices `247`, `267`, and `268` contribute +321 Life per 5 Seconds. Radiance contributes another +215 for a total of +536 when all four are allocated. The pinned attribute is `No_Damage_Taken_Flat_Hitpoints_Regen_Per_Second` (649, parameter -1). The registry stores the observed tooltip values in a distinct flat Life per 5 Seconds category, displayed in tooltips, raw-bonus details, and the sidebar.
+
+The three Magic Lucky Hit Chance cells at indices `48`, `69`, and `71` reuse Sentencing's +1.3% direct observation through the exact revision and node identity link. Together they grant +3.9%.
+
+| Rare node / SNO | Base bonuses | Observed conditional and requirement | Pinned selector |
+|---|---|---|---|
+| Restorative / `680037` | +4% Maximum Life, +6% Healing Received | +4% Maximum Life at 285 Willpower | `WillPowerSide2` |
+| Radiance / `2449928` | +10% Holy Damage, +215 Life per 5 Seconds | +10% Holy Damage at 1,345 Strength | `StrengthMain3` |
+| Anointed / `2449931` | +6% Healing Received, +10% Holy Damage | +6% Healing Received at 265 Willpower | `WillPowerSide1` |
+| Wrathful / `2449936` | +10% Holy Damage, +10 Strength | +10% Holy Damage at 285 Willpower | `WillPowerSide2` |
+| Grace / `2449915` | +2.5% Lucky Hit Chance, +10 Strength | +2.5% Lucky Hit Chance at 265 Willpower | `WillPowerSide1` |
+
+All five Rare definitions have direct in-game provenance for Endure, with slot 0 marked for the conditional. Thresholds use external attributes plus verified allocated Paragon stats. Both Restorative cells (`158` and `326`) use one definition and contribute independently. With both allocated they grant +8% base Maximum Life and +12% Healing Received, plus another +8% Maximum Life at 285 Willpower. The node also has an authored `IntelligenceSide2` selector. The observed Endure bonus uses only `WillPowerSide2`.
+
+#### Beacon at equip index 9
+
+All six Rare bonuses and requirements are direct, unamplified in-game observations for Beacon. The pinned nodes mark slot 0 for the conditional. Requirements use external attributes plus verified allocated Paragon stats. Sturdy and Constitution retain their exact-node bases from Fervent, and Champion retains its base from Divinity.
+
+| Rare node / SNO | Base bonuses | Observed conditional and requirement | Pinned selector |
+|---|---|---|---|
+| Sturdy / `2449942` | +3% Total Armor, +4% Maximum Life | +3% Total Armor at 265 Intelligence | `IntelligenceSide1` |
+| Spiked Shield / `2449949` | +2.5% Block Chance, +10% Damage | +2.5% Block Chance at 265 Willpower | `WillPowerSide1` |
+| Constitution / `2449944` | +3% Resistance to All Elements, +4% Maximum Life | +3% Resistance to All Elements at 1,085 Strength | `StrengthMain1` |
+| Blurring / `2449946` | +15% Critical Strike Damage, +1.3% Attack Speed | +15% Critical Strike Damage at 1,085 Strength | `StrengthMain1` |
+| Fortitude / `2449951` | +4 flat Maximum Faith, +10 Strength | +4 flat Maximum Faith at 265 Intelligence | `IntelligenceSide1` |
+| Champion / `2449940` | +10% Damage, +10 Strength | +10% Damage at 265 Willpower | `WillPowerSide1` |
+
+Fortitude uses `Resource_Max_Bonus` (161, parameter 9). Allocating the three Magic Faith cells and Fortitude gives +10 flat Maximum Faith, or +14 when the Intelligence threshold is met.
+
+Beacon records **+1.5% Total Armor per cell** for `Generic_Magic_DamageReductionFromElite` (`679347`) from a direct, unamplified in-game observation, scoped to Board 09 at equip index 9 and the pinned source identity. It and `Generic_Magic_Armor` (`671247`) both have one attribute in slot 0, `Armor_Percent` (482, parameter -1), and the same `ParagonNodeArmorBonus_Magic` reference (GBID `4074312502`). Their flat attribute-level formula is `0` in both cases. The node attribute literal is `0` for `679347` and empty for `671247`. The two Armor SNOs retain separate identities. The three cells of `679347` contribute +4.5% Total Armor, and the two cells of `671247` bring the combined Magic total to +7.5%.
+
+Before the direct observation, Beacon used a formula-derived +1.5% for `679347`. The pinned formula uses `0.75 * ParagonPowerBudgetMultiplierNodeMagicDefensive()`, and a multiplier of 2 reproduces the direct Board 00 Magic Armor and Maximum Life observations. Divinity's directly observed +1.5% Armor node `691371` matches the pinned fields of `679347` except for the SNO and file name, including the zero literal. [Pinned Armor formula table](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/GameBalance/AttributeFormulas.gam.json)
 
 The Legendary power on each board remains unresolved.
 
@@ -260,12 +297,20 @@ Headless Chrome over HTTP exercised all ten board options, chosen gate anchors, 
 
 After Knight's Shield Bearer conditional was added, 6,525 calculator comparisons across Boards 00–09 confirmed the expected Knight-only changes. Nine Knight boundary combinations covered Strength 1,154–1,156 and Willpower 259–261. Focused checks also confirmed that allocated stats count toward the thresholds, repeated indices grant the bonus once, and other equip contexts reject the observation. The full-grid diagnostic reports zero unresolved ordinary bonuses and one unresolved Legendary on Board 02. Headless Chrome verified Knight's displayed threshold progress, one-time bonus application, and recalculation on refund. All ten boards passed the allocation and persistence smoke checks again.
 
+Sentencing validation matched all eight new records to the pinned node definitions and selectors. All 18 Rare threshold checks passed below, at, and above the requirements, including the contribution from allocated Paragon stats. All 16 allocation combinations for the two repeated Magic node types passed, along with checks that the prior Magic links and reused Rare bases retained their values and provenance. The full-grid diagnostic found zero unresolved ordinary bonuses and one unresolved Legendary. All 5,989 baseline comparisons for Boards 00–06 and 08–09 matched.
+
+Headless Chrome verified Sentencing's six Rare threshold transitions and refunds, the three separate percentage categories, and restored allocation after switching boards. All ten boards passed the allocation and persistence smoke checks, including restore after a page reload.
+
+Endure validation matched all seven affected node types to the pinned definitions and selectors. All 18 Rare threshold checks passed below, at, and above the requirements, with both base bonuses preserved. All 16 allocation combinations for the two repeated Magic types and all 12 Restorative allocation and threshold combinations passed. The full-grid diagnostic found zero unresolved ordinary bonuses and one unresolved Legendary. All 5,959 baseline calculator comparisons for Boards 00–07 and 09 matched.
+
+Headless Chrome verified Endure's threshold transitions and refunds for all six Rare cells, both active Restorative conditionals, and the flat +536 Life per 5 Seconds total. Endure's allocations and totals restored after board switching and a page reload. All ten boards passed the shared allocation and persistence smoke checks again.
+
+Beacon validation matched all six Rare records and the derived Armor record to their pinned node attributes, slots, parameters, and applicable selectors. All 18 Rare boundary cases, 48 Magic and Rare Faith allocation and threshold combinations, and 32 Magic Armor allocation combinations passed. The full-grid diagnostic found zero unresolved ordinary bonuses and one unresolved Legendary. All 5,989 calculator comparisons for Boards 00–08 matched the baseline. The eight reused Beacon Magic records retained their values and provenance.
+
+Headless Chrome verified all six Beacon Rare threshold transitions and refunds, distinct Armor tooltip provenance, flat +14 Maximum Faith with Fortitude active, and restoration of allocations and totals after switching boards and reloading. All ten boards passed the shared allocation and persistence smoke checks.
+
+After the direct `679347` observation, all 32 Magic Armor allocation combinations passed again. The 6,681 calculator comparisons across Boards 00–09 showed only the expected provenance change. The full-grid audit checked every ordinary attribute and marked Rare conditional at zero and high external attributes and found zero unresolved ordinary numerical bonuses across all ten boards. Headless Chrome confirmed both Armor SNOs display their own identity and direct evidence, and that Beacon's Armor total restores after a reload.
+
 ## Current boundary
 
-Shield Bearer has complete ordinary numerical coverage at equip index 2, including Knight's directly observed two-attribute conditional.
-
-Fervent supports structural rendering, independent gate-anchored allocation, and every ordinary numerical bonus in equip context 3.
-
-Boards 04–06 have complete ordinary numerical coverage in their observed equip contexts, including all 18 Rare conditionals.
-
-Boards 07–09 have complete structural coverage. The evidence gaps for Magic bonuses, Rare bases, Rare conditionals, and Legendary powers are listed above.
+Boards 00–09 have complete ordinary numerical coverage in their supported equip contexts. Legendary powers and glyph effects remain deferred.
