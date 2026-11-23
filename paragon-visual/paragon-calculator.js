@@ -10,6 +10,7 @@ import {
   SENTENCING_BONUS_REGISTRY,
   SHIELD_BEARER_BONUS_REGISTRY
 } from "./paragon-bonus-registry.js";
+import { resolvePlacedRareThreshold } from "./paragon-thresholds.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -127,7 +128,7 @@ function getRegisteredAttribute(nodeRecord, attribute, attributeIndex) {
   return { invalid: false, record };
 }
 
-function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry) {
+function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry, placementIndex) {
   if (!record.thresholdReference) {
     return { resolved: false, thresholdReference: null, reason: "Conditional bonus has no threshold reference." };
   }
@@ -156,20 +157,32 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
     };
   }
 
-  const threshold = boardRegistry?.thresholds[record.thresholdReference];
-  if (threshold && definitionThreshold.snoId !== undefined && threshold.snoId !== definitionThreshold.snoId) {
-    return {
-      resolved: false,
-      thresholdReference: record.thresholdReference,
-      reason: "Threshold SNO does not match the node definition."
-    };
-  }
-  if (threshold && threshold.observedBoardEquipIndex !== boardRegistry?.observedBoardEquipIndex) {
-    return {
-      resolved: false,
-      thresholdReference: record.thresholdReference,
-      reason: "No verified threshold is available for this board equip position."
-    };
+  let threshold;
+  if (placementIndex !== undefined) {
+    threshold = resolvePlacedRareThreshold(definition, placementIndex);
+    if (threshold.name !== record.thresholdReference) {
+      return {
+        resolved: false,
+        thresholdReference: record.thresholdReference,
+        reason: threshold.reason || "Pinned selector does not match the observed conditional bonus record."
+      };
+    }
+  } else {
+    threshold = boardRegistry?.thresholds[record.thresholdReference];
+    if (threshold && definitionThreshold.snoId !== undefined && threshold.snoId !== definitionThreshold.snoId) {
+      return {
+        resolved: false,
+        thresholdReference: record.thresholdReference,
+        reason: "Threshold SNO does not match the node definition."
+      };
+    }
+    if (threshold && threshold.observedBoardEquipIndex !== boardRegistry?.observedBoardEquipIndex) {
+      return {
+        resolved: false,
+        thresholdReference: record.thresholdReference,
+        reason: "No verified threshold is available for this board equip position."
+      };
+    }
   }
   if (threshold && threshold.requiredValue === null) {
     return {
@@ -182,6 +195,13 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
       reason: threshold.unresolvedReason || "The threshold depends on unresolved runtime state."
     };
   }
+  const thresholdContext = placementIndex === undefined
+    ? { observedBoardEquipIndex: threshold?.observedBoardEquipIndex }
+    : {
+      placementIndex,
+      selectorSnoId: threshold.selectorSnoId,
+      ...(threshold.selectorProvenance && { selectorProvenance: threshold.selectorProvenance })
+    };
   if (threshold && Array.isArray(threshold.requirements)) {
     const requirementsValid = threshold.combination === "all"
       && threshold.requirements.length > 0
@@ -209,7 +229,7 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
       combination: "all",
       requirements,
       satisfied: requirements.every((requirement) => requirement.satisfied),
-      observedBoardEquipIndex: threshold.observedBoardEquipIndex,
+      ...thresholdContext,
       provenance: threshold.provenance
     };
   }
@@ -232,7 +252,7 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
     currentValue,
     remaining: Math.max(0, threshold.requiredValue - currentValue),
     satisfied: currentValue >= threshold.requiredValue,
-    observedBoardEquipIndex: threshold.observedBoardEquipIndex,
+    ...thresholdContext,
     provenance: threshold.provenance,
     formula: threshold.formula
   };
@@ -266,7 +286,19 @@ export function calculateParagonBonuses(
 
   const externalAttributes = normalizeExternalAttributes(externalAttributeInput);
   const candidateRegistry = BOARD_BONUS_REGISTRIES[board.__snoID__] || null;
-  const boardEquipIndex = calculationContext.boardEquipIndex ?? candidateRegistry?.observedBoardEquipIndex ?? null;
+  const usesPlacement = Object.hasOwn(calculationContext, "placementIndex");
+  const placementIndex = usesPlacement ? calculationContext.placementIndex : undefined;
+  if (usesPlacement) {
+    if (Object.hasOwn(calculationContext, "boardEquipIndex")) {
+      throw new Error("Use either a placement index or a legacy board equip index.");
+    }
+    const starting = board.__snoID__ === PARAGON_BONUS_REGISTRY.boardSnoId;
+    if (!Number.isInteger(placementIndex) || (starting ? placementIndex !== 0 : (placementIndex < 1 || placementIndex > 4))) {
+      throw new Error("Invalid placement index. Starting uses index 0 and additional boards use indices 1–4.");
+    }
+  }
+  // Single-board inspection retains its historical evidence context.
+  const boardEquipIndex = usesPlacement ? null : calculationContext.boardEquipIndex ?? candidateRegistry?.observedBoardEquipIndex ?? null;
   if (boardEquipIndex !== null && (!Number.isSafeInteger(boardEquipIndex) || boardEquipIndex < 0)) {
     throw new Error("Board equip index must be a non-negative whole number.");
   }
@@ -274,7 +306,7 @@ export function calculateParagonBonuses(
     && nodeDatabase.source.commit === candidateRegistry.sourceRevision
     && nodeDatabase.source.boardSnoId === candidateRegistry.boardSnoId
     && board.__snoID__ === candidateRegistry.boardSnoId
-    && boardEquipIndex === candidateRegistry.observedBoardEquipIndex
+    && (usesPlacement || boardEquipIndex === candidateRegistry.observedBoardEquipIndex)
     ? candidateRegistry
     : null;
   const verifiedFormulas = nodeDatabase.source.formulaSourcePath === FORMULA_SOURCE_PATH
@@ -431,7 +463,7 @@ export function calculateParagonBonuses(
     const registeredAttributes = registeredAttributesByNode.get(index);
     for (const [attributeIndex, record] of registeredAttributes) {
       if (record.conditional === 0) continue;
-      const threshold = evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry);
+      const threshold = evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry, placementIndex);
       thresholdResultsByAttribute.set(`${index}:${attributeIndex}`, threshold);
       if (!threshold.resolved) {
         addUnresolved(index, definition, definition.attributes[attributeIndex], attributeIndex, threshold.reason, true, false);
@@ -485,7 +517,7 @@ export function calculateParagonBonuses(
       let threshold = null;
       if (record && (record.conditional === null || record.conditional > 0)) {
         threshold = thresholdResultsByAttribute.get(`${index}:${attributeIndex}`)
-          || evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry);
+          || evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry, placementIndex);
         thresholdEvaluations.push(threshold);
       }
       attributeEvaluations.push({

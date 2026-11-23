@@ -15,7 +15,7 @@ This is a dependency-free browser viewer/calculator for Diablo IV Paladin Parago
 - **Board 08 — Endure** (SNO `2439033`), with complete ordinary numerical bonuses at equip index 8
 - **Board 09 — Beacon** (SNO `2439035`), with complete ordinary numerical bonuses at equip index 9
 
-`paragon-visual/app.js` loads board/node JSON, merges revision-pinned definitions from `shared-node-definitions.js` according to board SNO, renders the 21×21 grid, manages zoom/pan/tooltips and allocation connectivity, persists independent allocations, and passes allocated indices plus external attributes to the pure calculation module. `paragon-calculator.js` validates board/node identity and combines pinned core-stat formulas with board-scoped records from `paragon-bonus-registry.js`. Missing or mismatched numerical evidence is reported as unresolved rather than zero. The UI has a responsive, collapsible Paragon-only Total Stats sidebar beside the board; it derives totals and hover contributors from calculator node evaluations, excluding external attributes and inactive conditionals.
+`paragon-visual/app.js` loads board/node JSON, merges revision-pinned definitions from `shared-node-definitions.js` according to board SNO, renders the 21×21 grid, manages zoom/pan/tooltips and allocation connectivity, persists independent allocations, and passes allocated indices plus external attributes to the pure calculation module. `paragon-calculator.js` validates board/node identity and combines pinned core-stat formulas with board-scoped records from `paragon-bonus-registry.js`. Missing or mismatched numerical evidence is reported as unresolved rather than zero. The collapsible Total Stats panel floats inside the board viewport and derives Paragon-only totals and hover contributors from calculator node evaluations, excluding external attributes and inactive conditionals.
 
 Boards 01–09 have no authored starting node. The viewer lets the user choose one of their four gates as a **local allocation anchor**.
 
@@ -183,7 +183,7 @@ All three use the pinned formulas for Normal core stats (+5), Gates (+5 to each 
 
 #### Sentencing at equip index 7
 
-Direct, unamplified in-game observations resolve Magic Lucky Hit Chance at +1.3% (`1340824`) and Magic Judgement Damage at +5% (`2500772`). Each appears three times, for +3.9% Lucky Hit Chance and +15% Judgement Damage from those Magic cells. Holy Damage, Judgement Damage, and Lucky Hit Chance have separate percentage totals in the sidebar and raw-bonus details. The six prior Magic links remain in use.
+Direct, unamplified in-game observations resolve Magic Lucky Hit Chance at +1.3% (`1340824`) and Magic Judgement Damage at +5% (`2500772`). Each appears three times, for +3.9% Lucky Hit Chance and +15% Judgement Damage from those Magic cells. Holy Damage, Judgement Damage, and Lucky Hit Chance have separate percentage totals in Total Stats and raw-bonus details. The six prior Magic links remain in use.
 
 | Rare node / SNO | Base bonuses | Observed conditional and requirement | Pinned selector |
 |---|---|---|---|
@@ -198,7 +198,7 @@ Endure and Sturdy keep their exact-node bases from Relentless and Fervent respec
 
 #### Endure at equip index 8
 
-Magic Life Regeneration after taking no damage (`Generic_Magic_HPRegen`, SNO `679136`) grants +107 Life per 5 Seconds per cell from a direct, unamplified in-game observation. The three cells at indices `247`, `267`, and `268` contribute +321 Life per 5 Seconds. Radiance contributes another +215 for a total of +536 when all four are allocated. The pinned attribute is `No_Damage_Taken_Flat_Hitpoints_Regen_Per_Second` (649, parameter -1). The registry stores the observed tooltip values in a distinct flat Life per 5 Seconds category, displayed in tooltips, raw-bonus details, and the sidebar.
+Magic Life Regeneration after taking no damage (`Generic_Magic_HPRegen`, SNO `679136`) grants +107 Life per 5 Seconds per cell from a direct, unamplified in-game observation. The three cells at indices `247`, `267`, and `268` contribute +321 Life per 5 Seconds. Radiance contributes another +215 for a total of +536 when all four are allocated. The pinned attribute is `No_Damage_Taken_Flat_Hitpoints_Regen_Per_Second` (649, parameter -1). The registry stores the observed tooltip values in a distinct flat Life per 5 Seconds category, displayed in tooltips, raw-bonus details, and Total Stats.
 
 The three Magic Lucky Hit Chance cells at indices `48`, `69`, and `71` reuse Sentencing's +1.3% direct observation through the exact revision and node identity link. Together they grant +3.9%.
 
@@ -241,24 +241,79 @@ The Rotation selector beside the board selector offers 0°, 90°, 180°, and 270
 
 Single-board entry anchors serve only their board's internal allocation graph. The Connected Boards prototype uses a separate draft and a root on the Starting Board.
 
-### Connected Boards prototype
+### Connected Boards
 
-Select **Connected Boards** to open Starting Board and Castle on one canvas. Starting Board stays fixed. Castle sits above it, with a single bridge at the seam. Castle's rotation control selects the facing source gate. Choosing a Castle source gate sets the rotation that brings it to the seam.
+Select **Connected Boards** to open the saved planner or start a draft with Starting Board alone. Open any visible gate to attach an unused board or manage the gate's allocation. The tree supports up to five equipped boards, including Starting. Each additional header shows the placement number and offers rotation and removal.
 
 The pinned Starting Board has one `Generic_Gate` at source index `10`, coordinate `(10, 0)`. Its actual starting node is at index `304`. Castle has gates at source indices `10`, `210`, `230`, and `430` and no starting node. At Castle angles 0°, 90°, 180°, and 270°, its facing gate uses indices `430`, `230`, `10`, and `210` respectively. The shared gate definition has `bIsGate` and four core-stat slots verified at +5 each. The pinned assets contain no attachment graph, entry-selection rule, automatic allocation flag, or gate costs. [Pinned Starting Board](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonBoard/Paragon_Paladin_00.pbd.json), [Pinned Castle](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonBoard/Paragon_Paladin_01.pbd.json), [Pinned gate definition](https://github.com/DiabloTools/d4data/blob/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonNode/Generic_Gate.pgn.json)
 
 Blizzard's 2021 design overview describes unlocking a gate to attach another board and optionally rotating it. It gives historical context while leaving the pinned revision's exact attachment and entry purchase rules open. The prototype permits layout preview before allocation and models facing gates one grid step apart. Both gates require explicit allocation and cost one point each. Starting's actual starting node is free. East, south, and west attachments from Starting are unavailable because it has no gates there. [Blizzard's Paragon design overview](https://news.blizzard.com/en-gb/article/23746639/diablo-iv-quarterly-updatedecember-2021)
 
-`connected-boards.js` builds the graph in `(boardId, sourceNodeIndex)` identities. Each board contributes its internal orthogonal edges. The selected gate pair adds the sole cross-board edge. Allocations must be reachable from `(board00, 304)` within the allocated subgraph. Choosing a gate or angle grants no nodes. After the Starting gate is allocated, Castle's facing gate becomes eligible. Refunds and attachment changes that would disconnect existing allocations are rejected. A rotation can change the source gate at the seam after Castle is allocated if the new entry already connects the allocated Castle path to Starting.
+`connected-boards.js` builds the allocation graph in `(instanceId, sourceNodeIndex)` identities. Each board contributes its internal orthogonal edges and each attachment contributes its explicit gate bridge. Allocations must be reachable from Starting's source index `304` within the allocated subgraph. Attachment grants no nodes. Each gate costs one point when explicitly allocated. Refunds and topology changes that would disconnect existing allocations are rejected.
 
-The connected calculator first collects unconditional core gains from both boards with the existing calculator. It then evaluates each board's thresholds with external attributes plus the other board's core gains, and sums the resulting Paragon-only bonuses once. Starting stays at equip index 0 and Castle at 1. The wrapper rejects conditional core gains because they would require a different threshold evaluation strategy. The draft supports these two boards and their verified equip contexts. Glyph effects, Legendary powers, and other board orders remain outside its calculation.
+The connected calculator first collects unconditional core gains from all placed boards. It then evaluates each board's thresholds with external attributes plus the other boards' core gains, and sums the resulting Paragon-only bonuses once. The wrapper rejects conditional core gains because they would require a different threshold evaluation strategy. Glyph effects and Legendary powers remain unresolved.
+
+### UI redesign Phase 1 — Floating Total Stats
+
+The board canvas fills the available width. In `paragon-visual/index.html`, a shared viewport contains the interactive canvas and a native Total Stats disclosure. The panel starts expanded and retains its open or closed state when switching between single-board and Connected Boards modes. Point Allocation and External Attributes are above the canvas. The legend and collapsible Advanced Calculation Details are below it.
+
+`paragon-visual/style.css` anchors the translucent panel to the bottom-right of the viewport and gives the stat list a scrollable body with tighter size limits on small screens. `paragon-visual/app.js` uses the existing live totals, formatting, and contributor highlights. The panel clears highlights when it closes. Its position outside the interactive canvas element keeps its pointer, wheel, and touch interactions independent of the board.
+
+### UI redesign Phase 2 — Contextual board headers
+
+`paragon-visual/index.html` defines the two Connected Boards headers. Starting Board has a fixed name and board number. Castle shows its board number and current angle between labeled 90° rotation buttons. Phase 2 retained the gate selectors until the Phase 3 picker replaced them.
+
+`paragon-visual/app.js` anchors the headers to the board origins in the shared world frame. Castle's header sits above its north edge, and Starting Board's label sits in the empty upper-left area. Connected Boards fits the canvas with room for Castle's header. `paragon-visual/style.css` keeps the headers close to screen size at different zoom levels and leaves room in Castle's header for future board actions. Header interactions are isolated from canvas dragging, zooming, and node selection.
+
+Castle's buttons use the existing attachment validation and save path. A successful rotation updates the angle and source gate together while preserving allocations, pan, zoom, and button focus. A rejected rotation keeps the last valid layout and draft and reports the reason through Point Allocation.
+
+### UI redesign Phase 3 — Gate-driven board picker
+
+Click the Starting Board's only `Generic_Gate` at source index `10`, or focus it and press Enter or Space, to open the picker. The picker is available before the allocation path reaches the gate. Its separate **Allocate gate** action becomes available when the gate is reachable and spends one point. Once the gate is allocated, **Refund gate** uses the existing connectivity rule, as does right-clicking the node. Single-board gates and Castle's gate keep their original node actions.
+
+In the Phase 3 prototype, the picker listed all nine additional boards and Castle was the available choice. Every draft already included Castle. Stage 3 replaced confirmation of that fixed placement with interactive attachment and a version 2 draft.
+
+`paragon-visual/index.html` and `style.css` define a viewport-bound modal with a scrollable board list. `paragon-visual/app.js` connects it to the Starting gate and measures the visible viewport independently of the board transform. Escape, the close button, and outside clicks dismiss the picker and return focus to the gate. The picker replaces the permanent gate selectors and shows Castle's current source edge for diagnostics.
+
+### Multi-board implementation Stage 1 — Board instance layout
+
+`buildBoardInstanceLayout(resources, instances)` in `paragon-visual/connected-boards.js` builds a tree of up to five boards from pinned Paladin definitions. Each instance supplies `instanceId`, catalog `boardId`, `placementIndex`, clockwise `rotation`, and its `incoming` attachment. Starting has placement index 0, rotation 0, and `incoming: null`. An additional board identifies its parent instance and both source gate indices. Indices are explicit and contiguous, and a parent must precede its children. Input array order does not determine placement.
+
+The builder derives outgoing attachments, gate occupancy, signed world origins relative to Starting, and normalized display origins. It validates unique board definitions and instance IDs, a fixed Starting Board, supported rotations, parent order, facing source gates, gate reuse, and board footprint overlap. The separate allocation graph uses internal orthogonal edges and explicit gate pairs. Adjacent boards without an attachment share no allocation edge.
+
+`buildConnectedLayout` adapts the existing Starting + Castle attachment to the tree with instance IDs `board00` and `board01`, at placements 0 and 1. The version 1 reader validates the old draft against the tree. The writer accepts only a matching two-board layout and emits the existing shape under the existing key. Reading a draft does not write it back. If a stored draft cannot be read, the UI shows the fallback preview in memory and protects the original stored value from writes.
+
+The Stage 1 UI opened Starting + Castle, with Castle as the only selectable picker entry. The layout builder exposed `placementIndex` to the Stage 2 calculator. New attachments in the picker and board-management operations remain deferred.
+
+### Multi-board implementation Stage 2 — Dynamic Rare thresholds
+
+`calculateParagonBonuses` accepts an explicit `{ placementIndex }` context. Starting uses 0 and additional boards use 1–4. `calculateConnectedBonuses` passes that index from each board instance and evaluates against external attributes plus verified allocated core gains from every placed board. Stage 2 supported numerical evaluation of five-board layouts before Stage 3 exposed them in the viewer.
+
+`paragon-visual/paragon-thresholds.js` contains the pinned SNOs, Paladin class eligibility, attribute IDs, and authored expressions for all 14 referenced selectors. It evaluates the supported affine expressions exactly and reports unsupported references or expressions as unresolved. Paired selectors require all listed attributes. The registry still supplies base and conditional amounts with their original provenance. The resolver reports formula provenance separately from selector evidence. [Pinned threshold definitions](https://github.com/DiabloTools/d4data/tree/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonThreshold)
+
+- **Knight (`2449723`).** Controlled game observations gave `1,155 STR / 260 WIL` at placement 1, `1,610 / 330` at 2, and `2,065 / 400` at 3. Shield Bearer and Fervent followed placement when swapped. Index 4 and the other Rare placement requirements are source-derived predictions unless separately observed. [Pinned Knight selector](https://raw.githubusercontent.com/DiabloTools/d4data/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonThreshold/Paladin_Strength%2BWillpower.pth.json)
+- **Restorative (`680037`).** Paladin uses `WillPowerSide2`, or `210 + 75 × placementIndex` Willpower. Repeated direct tooltip observations, including Sentencing and Endure attached together, support the selector choice. Both authored references remain in the node metadata. Independent activation testing for the Intelligence reference remains open. Tenacity retains its directly verified Starting Board Strength selector. [Pinned Restorative definition](https://raw.githubusercontent.com/DiabloTools/d4data/75e619f0d90a0951945747f45feef59c076a5db0/json/base/meta/ParagonNode/Generic_Rare_042.pgn.json)
+
+The legacy `boardEquipIndex` context still powers independent board inspection and its historical regression fixtures. Its labels are catalog-scoped evidence contexts. Of 57 historical board/definition records, 10 match at labels 0–1, 18 differ if labels 2–4 are interpreted as placements, and 29 use labels outside the legal range. The 18 discrepancies include 16 records marked direct in-game and two planner records. All historical additional-board values match the pinned formula at index 1. The old observation records remain intact and the dedicated placement context computes its requirements from the source expressions.
+
+### Multi-board implementation Stage 3 — Interactive planner
+
+- Unused boards can be attached through any free gate on a placed board. New boards begin at 0° and use the facing source gate. Open the picker to attach a board or explicitly allocate or refund the gate. Incoming and occupied exit gates offer allocation actions and identify their existing attachment. Placement indices follow attachment order. Headers display their one-based placement number and catalog board number.
+- A rotation keeps the selected board at its parent seam, selects the source entry gate that now faces that seam, and turns descendants by the same amount while preserving their source gate identities. This is a planner policy. The layout builder checks gate reuse, facing directions, overlap, and global allocated reachability before the edit is committed. Rotation preserves the zoom and keeps Starting anchored if the extent changes. The viewport fits new attachments when the camera is at its fitted view.
+- Confirmed removal applies to unallocated leaves. It preserves every surviving board's identity, rotates no board, and renumbers placement indices in attachment order. Removing a board frees its parent gate for an explicit new attachment. Requirements and Totals recalculate after a committed layout or allocation change and after editing external attributes.
+- Contextual headers use a canvas-aligned layer above the floating Total Stats panel so its overlay cannot intercept their controls. Controls scale down at overview zoom. Zooming in increases the visible size of gates and labels. Header controls are keyboard reachable before board cells. Tooltips and Total Stats contributor highlighting retain instance-qualified node identities.
+- Pinned geometry and the validated tree drive the planner. The one-grid-step seam, initial 0° child rotation, subtree rotation policy, leaf-only removal, and placement compaction are planner behavior. The observed game evidence establishes branching, placement-dependent Knight requirements, and the five-board cap. It does not establish every rotation or removal policy.
 
 ## Important files
 
 - `paragon-visual/index.html`, `style.css`, `app.js` — UI, rendering, interaction, persistence.
 - `paragon-visual/board-rotation.js` — pure clockwise coordinate transform.
-- `paragon-visual/connected-boards.js` — attachment geometry, global graph, draft validation, and two-pass calculation.
+- `paragon-visual/connected-boards.js` — board instance tree, attachment geometry, allocation graph, version 1 adapter, and two-pass calculation.
+- `tests/connected-boards.test.mjs` — pinned fixture tests for branching layouts and version 1 compatibility.
 - `paragon-visual/paragon-calculator.js` — calculation and unresolved-bonus engine.
+- `paragon-visual/paragon-thresholds.js` — pinned Rare selectors and placement-derived requirements.
+- `tests/paragon-thresholds.test.mjs` — placement, activation, provenance, and legacy threshold comparisons.
+- `tests/planner-browser.test.mjs` — interaction, migration, and recovery checks in Chrome.
 - `paragon-visual/paragon-bonus-registry.js` — revision/board/SNO-scoped numerical evidence.
 - `paragon-visual/shared-node-definitions.js` — authoritative pinned reusable Normal, compatible Magic, and verified Gate definitions with per-board applicability and merge validation.
 - `paladin-board-00.json` through `paladin-board-09.json` — board grids.
@@ -275,20 +330,29 @@ The connected calculator first collects unconditional core gains from both board
 - Boards 01–09 keep their independent `d4-paragon-paladin-01-v1` through `d4-paragon-paladin-09-v1` keys. Each save contains the source-index fields `entryNodeIndex` and `allocatedNodeIndices` plus `rotation` in clockwise degrees. Saves with a missing or unsupported rotation load at 0° and retain their valid allocations. Reset Allocation preserves rotation.
 - External attributes use `d4-paragon-paladin-00-external-attributes-v1` and are shared by the calculator view.
 - Build-file import/export remains **Board 00 only**, schema version 1. Boards 01–09 disable these buttons.
-- Connected Boards uses `d4-paragon-paladin-connected-v1` with `version: 1`, `sourceRevision`, an `attachment` object containing `startingGateIndex`, `castleEntryIndex`, and `castleRotation`, and `allocations` as pairs of board ID and source index. The `#connected` address opens the draft on reload. Single-board allocation keys and build files remain separate. The existing external attribute inputs are shared between modes.
+- Connected Boards writes `d4-paragon-paladin-connected-v2`. Its top-level fields are `version: 2`, `sourceRevision`, and `boards`. Each board stores `instanceId`, `boardId`, `placementIndex`, `rotation`, `incoming` (null for Starting, otherwise `parentInstanceId`, `parentGateIndex`, and `entryGateIndex`), and `allocatedSourceIndices`. The model rebuilds coordinates, occupancy and edges from these fields and validates allocated reachability before loading.
+- Version 2 takes precedence on load. If it is absent, a valid `d4-paragon-paladin-connected-v1` draft is loaded through the adapter and copied to the version 2 key with allocations, Castle rotation, and gate identities preserved. The original version 1 key remains available. An invalid or unsupported draft, or one whose board resources failed to load, is preserved and the viewer falls back to an in-memory Starting-only layout with saving blocked. A stored version 2 value changed after load also blocks writes until reload. The `#connected` address opens the connected draft.
 
 ## Known limitations
 
 - No glyph effects or Legendary power calculation.
-- Castle Rare numbers/requirements are verified only for equip index 1; other placements remain unresolved.
+- Direct placement-scaling evidence is available for Knight at indices 1–3. Other source-derived placement predictions have the coverage described in Stage 2.
 - Formula-derived Castle Magic outputs are not all direct Castle tooltip observations, and power-budget intrinsic values must not be generalized beyond documented evidence.
-- Attachment is experimental and limited to Starting Board and Castle. Single-board gate anchors remain local.
+- Single-board gate anchors remain local. The connected planner supports one instance per catalog board and up to five equipped boards.
 - Totals cover registered Paragon bonuses, not a complete character sheet.
 - No live visual browser pass has been completed for the final Board 01 calculation state.
 
 ## Running and testing
 
-There is no package manager or committed automated test suite. Serve the repository root over HTTP, for example:
+The viewer has no package manager. Run the automated tests with Node.js 22 or later:
+
+```sh
+node --experimental-default-type=module --test tests/*.test.mjs
+```
+
+Set `CHROME_PATH` to the Chrome executable to include the headless browser test. The test uses a temporary profile and a local HTTP server.
+
+Serve the repository root over HTTP to use the viewer, for example:
 
 ```powershell
 python -m http.server 8000
@@ -338,6 +402,32 @@ Connected Boards validation checked all four Castle placements, rejected 24 unsu
 
 Headless Chrome verified both boards on one zoomable and pannable canvas, all four Castle rotations, pointer selection at the rotated entry gate, one point per gate, threshold tooltips, blocked disconnecting refunds and rotations, and successful rotation with a reachable alternate entry and unchanged allocations and totals. Reload restored the bridge and draft at 90°. All ten single-board saves remained intact, and Board 00 import/export passed with schema version 1. The single-board suite also rechecked all 36 orientations and 144 gate positions and directions.
 
+Phase 1 checks over HTTP in headless Chrome covered both modes at 1440 × 1050 and at emulated 390 × 740 and 320 × 640 mobile sizes. The panel stayed anchored through pan and zoom, retained its disclosure state across mode switches, and preserved the board transform when toggled. Mouse and keyboard checks confirmed contributor highlighting, including contributors on both connected boards. Allocation, refunds, and external attribute changes updated totals live, including Starting Board's Brawn and Castle's Knight conditionals. Mobile wheel and touch input scrolled the stat list while leaving the board transform and allocations intact. The zoom, board, and attachment controls remained outside the overlay.
+
+Twenty-two browser snapshots compared the overlay to the pre-change viewer across all ten single boards and Connected Boards with low and high external attributes. All 234 rows across 28 categories matched for labels, ordering, displayed values, and accessibility labels. The existing temporary regression harness passed all 6,699 calculator comparisons, the full-grid ordinary-bonus audit, all 36 single-board orientations and 144 gate checks, and the Connected Boards attachment, threshold, allocation, persistence, and Board 00 import/export checks.
+
+Phase 2 browser checks used headless Chrome at 1440 × 1050 and emulated mobile sizes of 390 × 740 and 320 × 640. Mouse, keyboard, and touch checks verified both rotation directions, focus retention after a turn, fitted header visibility, and separation from gate nodes and Total Stats. Four clockwise turns restored all node positions and source identities. Browser checks also covered synchronized gate selection, active-bridge preservation, rejection of a disconnecting turn without modifying allocations or the saved draft, and restoration of a valid rotation after reload. Headers followed the board during pan and zoom while Total Stats stayed viewport-anchored.
+
+The regression harness passed 6,699 calculator comparisons and the full-grid ordinary-bonus audit. It also rechecked all 36 single-board orientations and 144 gate positions and directions, all four Connected Boards placements, 24 invalid gate pairs, seven combined threshold cases, allocation and refund behavior, save restoration, and Board 00 import/export. The Phase 1 desktop and mobile overlay checks passed again, and all 234 rendered stat rows still matched the baseline.
+
+Phase 3 checks used headless Chrome over HTTP at 1440 × 1050 and emulated 390 × 740 and 320 × 640 mobile sizes. The picker opened before and after the Starting gate became eligible to allocate. Opening or confirming Castle preserved points, allocations, the board transform, and the saved draft. All eight unsupported choices were disabled. Escape, the close button, and outside clicks dismissed the picker and restored focus. Keyboard navigation skipped disabled choices, and mobile touch scrolled the list independently of the board.
+
+The same browser checks verified the explicit one-point allocation, picker and right-click refunds, rejection of a refund or turn that would disconnect Castle, a valid rotation with allocations preserved, a single bridge after repeated Castle selection, and reload of the exact version 1 draft. Single-board gate clicks and refunds, the contextual headers, and the floating Total Stats panel and contributor highlights all passed. The existing harness passed 6,699 calculator comparisons, the full-grid ordinary-bonus audit, 36 single-board orientations and 144 gate checks, four connected layouts, 24 rejected gate pairs, seven combined threshold cases, and persistence and Board 00 build-file checks. All 234 rendered stat rows still matched the baseline.
+
+Multi-board Stage 1 passed five Node.js tests using the pinned fixtures. These covered a five-board branch with shuffled input order, all 36 placements formed from the nine additional definitions and four rotations, adjacent boards with unconnected facing gates, 18 invalid tree proposals, and version 1 round trips for all Castle rotations with both empty and populated drafts. A separate pre-change comparison matched all four Starting + Castle layouts, 140 complete calculation results, and 28 version 1 save payloads byte for byte.
+
+The existing harness passed 6,699 single-board calculator comparisons, the full-grid ordinary-bonus audit, 36 single-board orientations and 144 gate checks, 24 rejected gate pairs, and seven connected threshold cases. Headless Chrome rechecked allocation and refund connectivity, Castle rotation and reload, all ten single-board saves, Board 00 import/export, the picker and contextual headers, and Total Stats on desktop and at emulated 390 × 740 and 320 × 640 mobile sizes. All 234 rendered stat rows matched the baseline. Malformed JSON and an unsupported connected save version both remained stored after in-memory edits and mode changes.
+
+Stage 2 passed all 11 Node.js tests. They cover all 44 Rare definitions and 220 legal cell/placement combinations, the 11 Paladin selectors and three class-ineligible references, boundary checks on each attribute in an AND condition, the observed Knight swap, and both Endure Restorative cells. The extraction matched all 14 pinned selector identities, class flags, and 17 expressions. The Stage 1 branching test now expects a calculation result from the five-board layout and continues to reject writing that layout as a version 1 save.
+
+The existing 6,699 single-board calculator comparisons passed exactly. A separate pre-change comparison matched 140 full Starting + Castle results across four rotations after excluding threshold-specific evidence metadata. The numerical requirements, amounts, activation states, and bonus provenance matched. All 28 version 1 save payloads matched byte for byte. Headless Chrome passed the connected calculation, rotation, allocation, refund, reload, picker, header, and Total Stats checks, including emulated 390 × 740 and 320 × 640 mobile views. All 234 rendered stat rows matched the legacy baseline.
+
+Stage 3 passed all 16 automated tests with Chrome enabled. Model checks attached all nine catalog choices, exercised branching and the five-board cap, rejected duplicate boards and occupied gates, and verified subtree rotation, overlap and allocated-path rejection, confirmed-removal eligibility, and placement reassignment. Five-board calculations verified independent per-cell contributions and no duplicated base or conditional totals. The Stage 2 Knight swap, cross-board core gains, and Restorative cases passed again.
+
+Headless Chrome checked mouse and keyboard operation at 1440 × 1050, all five headers in an emulated 320 × 640 overview, and touch attachment and subtree rotation at 390 × 740. It exercised occupied gates, the cap, placement 4 and renumbered Knight tooltips, contextual controls, zoom and pan, anchored Total Stats and branch contributor highlighting, removal cancellation and confirmation, refund rejection, and reload of branch allocations and rotations. It also checked version 1 migration, version 2 precedence, protection of malformed and future-version values, and recovery after a temporarily unavailable board resource.
+
+All 6,699 historical single-board calculator comparisons matched exactly. All 36 single-board orientations, 144 gate checks, and ten independent save restores passed. A separate Stage 2 comparison matched all 140 Starting + Castle results exactly, and the legacy writer produced identical version 1 payloads in all 28 cases.
+
 ## Current boundary
 
-Boards 00–09 have complete ordinary numerical coverage in their supported equip contexts. Boards 01–09 support local rotation. Connected Boards supports the Starting Board and Castle under the documented prototype assumptions. Other attachments, Legendary powers, and glyph effects remain deferred.
+Boards 00–09 retain their historical inspection contexts, and Boards 01–09 support local rotation. The connected planner equips up to five boards selected from the Paladin catalog and saves them in version 2. Legendary powers and glyph effects remain deferred. Direct placement-scaling evidence covers Knight at positions 1–3. Other placement predictions and the Restorative selector caveat are documented in Stage 2.

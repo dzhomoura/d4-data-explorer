@@ -1,6 +1,6 @@
 const SOURCE_REVISION = "75e619f0d90a0951945747f45feef59c076a5db0";
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
-const BOARD_SNO_IDS = Object.freeze({
+export const BOARD_SNO_IDS = Object.freeze({
   board00: 2436481,
   board01: 2436511,
   board02: 2436844,
