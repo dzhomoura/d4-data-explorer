@@ -1,4 +1,4 @@
-import { CASTLE_BONUS_REGISTRY, PARAGON_BONUS_REGISTRY, SHIELD_BEARER_BONUS_REGISTRY } from "./paragon-bonus-registry.js";
+import { CASTLE_BONUS_REGISTRY, FERVENT_BONUS_REGISTRY, PARAGON_BONUS_REGISTRY, SHIELD_BEARER_BONUS_REGISTRY } from "./paragon-bonus-registry.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -32,7 +32,8 @@ const BONUS_CATEGORIES = Object.freeze([
 const BOARD_BONUS_REGISTRIES = Object.freeze({
   [PARAGON_BONUS_REGISTRY.boardSnoId]: PARAGON_BONUS_REGISTRY,
   [CASTLE_BONUS_REGISTRY.boardSnoId]: CASTLE_BONUS_REGISTRY,
-  [SHIELD_BEARER_BONUS_REGISTRY.boardSnoId]: SHIELD_BEARER_BONUS_REGISTRY
+  [SHIELD_BEARER_BONUS_REGISTRY.boardSnoId]: SHIELD_BEARER_BONUS_REGISTRY,
+  [FERVENT_BONUS_REGISTRY.boardSnoId]: FERVENT_BONUS_REGISTRY
 });
 const ZERO_EXTERNAL_ATTRIBUTES = Object.freeze({
   Strength: 0,
@@ -57,8 +58,8 @@ function normalizeExternalAttributes(externalAttributes) {
   return normalized;
 }
 
-function createBonusTotals() {
-  return Object.fromEntries(BONUS_CATEGORIES.map((category) => [
+function createBonusTotals(categories) {
+  return Object.fromEntries(categories.map((category) => [
     category,
     { unconditional: 0, conditional: 0, total: 0 }
   ]));
@@ -67,7 +68,7 @@ function createBonusTotals() {
 function getRegistryNode(definition, boardRegistry) {
   if (!boardRegistry) return null;
   const record = boardRegistry.nodes[String(definition.snoId)];
-  if (record && record.name === definition.name) return record;
+  if (record?.name === definition.name && record.sourcePath === definition.sourcePath) return record;
 
   for (const reuse of boardRegistry.reuseNodeRecords || []) {
     if (!Number.isSafeInteger(reuse?.sourceBoardSnoId)
@@ -99,6 +100,7 @@ function getRegisteredAttribute(nodeRecord, attribute, attributeIndex) {
   if (!record) return null;
   if (record.attributeId !== attribute.id
     || record.attributeName !== attribute.name
+    || (record.attributeParam !== undefined && record.attributeParam !== attribute.param)
     || record.formulaReference !== (attribute.formulaReference || null)) {
     return { invalid: true, record };
   }
@@ -121,6 +123,13 @@ function evaluateThreshold(definition, nodeRecord, record, totalAttributes, boar
       resolved: false,
       thresholdReference: record.thresholdReference,
       reason: "Threshold reference is not present on this node definition."
+    };
+  }
+  if (record.conditional === null) {
+    return {
+      resolved: false,
+      thresholdReference: record.thresholdReference,
+      reason: "Conditional amount and threshold requirement are unverified for this board."
     };
   }
 
@@ -247,7 +256,8 @@ export function calculateParagonBonuses(
     Willpower: 0,
     Dexterity: 0
   };
-  const bonusTotals = createBonusTotals();
+  const bonusCategories = BONUS_CATEGORIES.concat(candidateRegistry?.additionalBonusCategories || []);
+  const bonusTotals = createBonusTotals(bonusCategories);
   const verifiedDetails = [];
   const registeredAttributesByNode = new Map();
   const thresholdResultsByAttribute = new Map();
@@ -314,8 +324,8 @@ export function calculateParagonBonuses(
       if (registered) {
         const record = registered.record;
         if (!Number.isFinite(record.base) || record.base < 0
-          || !Number.isFinite(record.conditional) || record.conditional < 0
-          || (record.category !== "coreAttribute" && !BONUS_CATEGORIES.includes(record.category))) {
+          || (record.conditional !== null && (!Number.isFinite(record.conditional) || record.conditional < 0))
+          || (record.category !== "coreAttribute" && !bonusCategories.includes(record.category))) {
           addUnresolved(index, definition, attribute, attributeIndex, "Observed bonus registry contains an invalid value or category.", record.conditional > 0);
           continue;
         }
@@ -387,7 +397,7 @@ export function calculateParagonBonuses(
     const nodeRecord = getRegistryNode(definition, boardRegistry);
     const registeredAttributes = registeredAttributesByNode.get(index);
     for (const [attributeIndex, record] of registeredAttributes) {
-      if (record.conditional <= 0) continue;
+      if (record.conditional === 0) continue;
       const threshold = evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry);
       thresholdResultsByAttribute.set(`${index}:${attributeIndex}`, threshold);
       if (!threshold.resolved) {
@@ -439,7 +449,7 @@ export function calculateParagonBonuses(
       }
 
       let threshold = null;
-      if (record?.conditional > 0) {
+      if (record && (record.conditional === null || record.conditional > 0)) {
         threshold = thresholdResultsByAttribute.get(`${index}:${attributeIndex}`)
           || evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry);
         thresholdEvaluations.push(threshold);
@@ -472,7 +482,7 @@ export function calculateParagonBonuses(
     });
   }
 
-  for (const category of BONUS_CATEGORIES) {
+  for (const category of bonusCategories) {
     const totals = bonusTotals[category];
     totals.total = totals.unconditional + totals.conditional;
   }

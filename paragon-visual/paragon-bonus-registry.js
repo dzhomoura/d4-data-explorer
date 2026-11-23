@@ -552,3 +552,139 @@ export const SHIELD_BEARER_BONUS_REGISTRY = {
     }
   }
 };
+
+// Fervent Rare bonuses and requirements are direct in-game observations at equip index 3.
+export const FERVENT_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2438913,
+  observedBoardEquipIndex: 3,
+  additionalBonusCategories: ["criticalStrikeDamage", "maximumFaith"],
+  thresholds: {
+    StrengthMain1: {
+      snoId: 1015345,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1085,
+      observedBoardEquipIndex: 3,
+      provenance: DIRECT_IN_GAME
+    },
+    IntelligenceSide1: {
+      snoId: 1015350,
+      requiredAttribute: "Intelligence",
+      requiredAttributeId: 19,
+      requiredValue: 265,
+      observedBoardEquipIndex: 3,
+      provenance: DIRECT_IN_GAME
+    },
+    "Paladin_Strength+Willpower": {
+      snoId: 2504901,
+      combination: "all",
+      requirements: [
+        { requiredAttribute: "Strength", requiredAttributeId: 18, requiredValue: 1155 },
+        { requiredAttribute: "Willpower", requiredAttributeId: 20, requiredValue: 260 }
+      ],
+      observedBoardEquipIndex: 3,
+      provenance: DIRECT_IN_GAME
+    },
+    "Paladin_Strength+Intelligence": {
+      snoId: 2504903,
+      combination: "all",
+      requirements: [
+        { requiredAttribute: "Strength", requiredAttributeId: 18, requiredValue: 1155 },
+        { requiredAttribute: "Intelligence", requiredAttributeId: 19, requiredValue: 260 }
+      ],
+      observedBoardEquipIndex: 3,
+      provenance: DIRECT_IN_GAME
+    },
+    StrengthMain3: {
+      snoId: 1015346,
+      requiredAttribute: "Strength",
+      requiredAttributeId: 18,
+      requiredValue: 1345,
+      observedBoardEquipIndex: 3,
+      provenance: DIRECT_IN_GAME
+    }
+  },
+  reuseNodeRecords: [
+    {
+      sourceBoardSnoId: 2436481,
+      nodeSnoIds: [679184]
+    },
+    {
+      sourceBoardSnoId: 2436511,
+      nodeSnoIds: [2127186, 678822, 678750]
+    }
+  ],
+  nodes: {
+    "2449944": {
+      name: "Paladin_Rare_055",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_055.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 79, attributeName: "Resistance_All_Bonus_Percent", attributeParam: -1, formulaReference: "ParagonNodeResistAll_RareMajor", category: "allResistance", base: 3, conditional: 3, thresholdReference: "StrengthMain1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeHPMaxBonus_RareMinor", category: "maximumLifePercent", base: 4, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449942": {
+      name: "Paladin_Rare_054",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_054.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMajor", category: "totalArmorPercent", base: 3, conditional: 3, thresholdReference: "IntelligenceSide1", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 142, attributeName: "Hitpoints_Max_Percent_Bonus", attributeParam: -1, formulaReference: "ParagonNodeHPMaxBonus_RareMinor", category: "maximumLifePercent", base: 4, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449723": {
+      name: "Paladin_Rare_010",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_010.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", attributeParam: 0, formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449771": {
+      name: "Paladin_Rare_021",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_021.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 288, attributeName: "Crit_Damage_Percent", attributeParam: -1, formulaReference: "ParagonNodeCritDamage_RareMajor", category: "criticalStrikeDamage", base: 15, conditional: 15, thresholdReference: "Paladin_Strength+Intelligence", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449765": {
+      name: "Paladin_Rare_018",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_018.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 161, attributeName: "Resource_Max_Bonus", attributeParam: 9, formulaReference: "ParagonNodeResourceBonus_RareMajor", category: "maximumFaith", base: 4, conditional: 4, thresholdReference: "StrengthMain3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 288, attributeName: "Crit_Damage_Percent", attributeParam: -1, formulaReference: "ParagonNodeCritDamage_RareMinor", category: "criticalStrikeDamage", base: 15, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449763": {
+      name: "Paladin_Rare_017",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_017.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", attributeParam: 0, formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 482, attributeName: "Armor_Percent", attributeParam: -1, formulaReference: "ParagonNodeArmorBonus_RareMinor", category: "totalArmorPercent", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2525975": {
+      name: "Paladin_Magic_Faith",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Magic_Faith.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 161, attributeName: "Resource_Max_Bonus", attributeParam: 9, formulaReference: "ParagonNodeResourceBonus_Magic", category: "maximumFaith", base: 2, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "671242": {
+      name: "Generic_Magic_CriticalDamage",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_CriticalDamage.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 288, attributeName: "Crit_Damage_Percent", attributeParam: -1, formulaReference: "ParagonNodeCritDamage_Magic", category: "criticalStrikeDamage", base: 7.5, conditional: 0, thresholdReference: null, provenance: FORMULA_DERIVED, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    }
+  }
+};

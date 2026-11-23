@@ -41,6 +41,16 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       requiresEntryGate: true,
       supportsBuildFiles: false,
       calculationScope: "Board 02 resolves shared Normal/Gate +5 core attributes; selected shared Magic bonuses including +100 flat Thorns; direct Stalwart, Growth, and Constrict bonuses; base-only Knight bonuses; and planner-observed Bludgeoning/Bodyguard base and threshold bonuses. Remaining Magic effects, thresholds, and the legendary power remain unresolved."
+    }),
+    board03: Object.freeze({
+      label: "Board 03 — Fervent",
+      boardUrl: "../paladin-board-03.json",
+      nodeDatabaseUrl: "node-data-03.json",
+      storageKey: "d4-paragon-paladin-03-v1",
+      boardEquipIndex: 3,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      calculationScope: "Fervent resolves ordinary node bonuses and all six observed Rare thresholds at equip index 3. The Legendary power remains unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -131,6 +141,18 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       unconditional: document.getElementById("raw-thorns-base"),
       conditional: document.getElementById("raw-thorns-conditional"),
       total: document.getElementById("raw-thorns-total")
+    },
+    criticalStrikeDamage: {
+      panel: document.getElementById("raw-critical-damage-panel"),
+      unconditional: document.getElementById("raw-critical-damage-base"),
+      conditional: document.getElementById("raw-critical-damage-conditional"),
+      total: document.getElementById("raw-critical-damage-total")
+    },
+    maximumFaith: {
+      panel: document.getElementById("raw-faith-panel"),
+      unconditional: document.getElementById("raw-faith-base"),
+      conditional: document.getElementById("raw-faith-conditional"),
+      total: document.getElementById("raw-faith-total")
     }
   };
   const statsSidebarList = document.getElementById("stats-sidebar-list");
@@ -160,7 +182,9 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     Resistance_All_Bonus_Percent: "Resistance to All Elements",
     Block_Chance: "Block Chance",
     Block_Damage_Percent_Bonus: "Blocked Damage Reduction",
-    Thorns_Flat: "Thorns"
+    Thorns_Flat: "Thorns",
+    Crit_Damage_Percent: "Critical Strike Damage",
+    Resource_Max_Bonus: "Maximum Faith"
   };
   const CORE_ATTRIBUTE_NAMES = Object.freeze({
     Strength_Core: "Strength",
@@ -178,7 +202,9 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     allResistance: "Resistance to All Elements",
     blockChance: "Block Chance",
     blockedDamageReduction: "Blocked Damage Reduction",
-    thorns: "Thorns"
+    thorns: "Thorns",
+    criticalStrikeDamage: "Critical Strike Damage",
+    maximumFaith: "Maximum Faith"
   });
   const KIND_LABELS = {
     normal: "Normal",
@@ -249,7 +275,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
 
   function formatBonusValue(value, category) {
     const sign = value > 0 ? "+" : "";
-    if (category === "coreAttribute" || category === "thorns") return `${sign}${value}`;
+    if (category === "coreAttribute" || category === "thorns" || category === "maximumFaith") return `${sign}${value}`;
     return `${sign}${Number.isInteger(value) ? value : Number(value.toFixed(2))}%`;
   }
 
@@ -305,18 +331,22 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
               allResistance: "Resistance to All Elements",
               blockChance: "Block Chance",
               blockedDamageReduction: "Blocked Damage Reduction",
-              thorns: "Thorns"
+              thorns: "Thorns",
+              criticalStrikeDamage: "Critical Strike Damage",
+              maximumFaith: "Maximum Faith"
             }[calculation.category];
           const basePrefix = calculation.provenance === "verified-game-formula"
             ? "Verified bonus"
-            : calculation.conditional > 0 ? "Base bonus" : "Raw bonus";
+            : calculation.threshold ? "Base bonus" : "Raw bonus";
           addText(
             row,
             "p",
             "tooltip-bonus tooltip-bonus--verified",
             `${basePrefix}: ${formatBonusValue(calculation.unconditional, calculation.category)} ${valueLabel}`
           );
-          if (calculation.conditional > 0) {
+          if (calculation.conditional === null) {
+            addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", calculation.threshold.reason);
+          } else if (calculation.conditional > 0) {
             addText(
               row,
               "p",
@@ -403,7 +433,9 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
         "tooltip-formula-note",
         currentBoardKey === "board00"
           ? "Only the in-game verified starting-board requirement is evaluated."
-          : "Castle thresholds are evaluated only for the observed equip-index-1 context."
+          : currentBoardKey === "board03"
+            ? "Fervent thresholds use total attributes and the observed equip-index-3 requirements."
+            : "Castle thresholds are evaluated only for the observed equip-index-1 context."
       );
       tooltip.appendChild(thresholds);
     }
@@ -1028,11 +1060,17 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     }
 
     const categories = result.verifiedParagonBonuses.rawBonuses;
-    for (const [category, totals] of Object.entries(categories)) {
-      const displays = rawBonusDisplays[category];
-      if (!displays) continue;
+    const unresolvedConditionals = new Set(result.nodeEvaluations
+      .filter((node) => node.allocated)
+      .flatMap((node) => node.attributes.filter((attribute) => attribute.conditional === null).map((attribute) => attribute.category)));
+    for (const [category, displays] of Object.entries(rawBonusDisplays)) {
+      const totals = categories[category];
+      if (displays.panel) displays.panel.hidden = !totals;
+      if (!totals) continue;
       displays.unconditional.textContent = formatRawBonusValue(totals.unconditional, category);
-      displays.conditional.textContent = formatRawBonusValue(totals.conditional, category);
+      displays.conditional.textContent = unresolvedConditionals.has(category)
+        ? "Unresolved"
+        : formatRawBonusValue(totals.conditional, category);
       displays.total.textContent = formatRawBonusValue(totals.total, category);
     }
     renderStatsSidebar(result);
@@ -1049,7 +1087,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
   }
 
   function formatRawBonusValue(value, category) {
-    if (category === "thorns") {
+    if (category === "thorns" || category === "maximumFaith") {
       const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
       return `${value >= 0 ? "+" : ""}${rounded}`;
     }
@@ -1105,7 +1143,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     }
     for (const [category, totals] of Object.entries(result.verifiedParagonBonuses.rawBonuses)) {
       if (totals.total !== 0) {
-        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || category, value: totals.total, flat: category === "thorns" });
+        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || category, value: totals.total, flat: category === "thorns" || category === "maximumFaith" });
       }
     }
     statsSidebarList.replaceChildren();
@@ -1309,6 +1347,16 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
     } catch (error) {
       console.error("Could not load Paladin Board 02:", error);
       setAllocationMessage(`Board 02 could not be loaded. (${error.message})`, true);
+    }
+
+    try {
+      const board03 = await loadBoardResource("board03");
+      boardResources.set("board03", board03);
+      const board03Option = boardSelector.querySelector('option[value="board03"]');
+      if (board03Option) board03Option.disabled = false;
+    } catch (error) {
+      console.error("Could not load Paladin Board 03:", error);
+      setAllocationMessage(`Board 03 could not be loaded. (${error.message})`, true);
     }
   })();
 })();
