@@ -1,9 +1,9 @@
 import { calculateParagonBonuses } from "./paragon-calculator.js";
 import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
-import { BOARD_ROTATIONS, rotateBoardPoint } from "./board-rotation.js";
+import { BOARD_ROTATIONS, getBoardControlPositions, rotateBoardPoint } from "./board-rotation.js";
 import {
   attachBoard, calculateConnectedBonuses, CONNECTED_SAVE_KEY, CONNECTED_SAVE_KEY_V2, createStartingLayout, MAX_BOARDS,
-  readConnectedSave, readConnectedSaveV2, removeConnectedBoard, rotateConnectedBoard, writeConnectedSaveV2
+  planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, removeConnectedBoard, rotateConnectedBoard, writeConnectedSaveV2
 } from "./connected-boards.js";
 
 (() => {
@@ -13,9 +13,6 @@ import {
   const MIN_ZOOM = 0.35;
   const MAX_ZOOM = 2.5;
   const ZOOM_STEP = 0.15;
-  const CONNECTED_FIT_TOP = 94;
-  const CONNECTED_FIT_BOTTOM = 24;
-  const CONNECTED_FIT_PAN_Y = (CONNECTED_FIT_TOP - CONNECTED_FIT_BOTTOM) / 2;
   const LEGACY_BOARD_00_STORAGE_KEY = "d4-paragon-paladin-00-v1";
   const EXTERNAL_ATTRIBUTES_STORAGE_KEY = "d4-paragon-paladin-00-external-attributes-v1";
   const BUILD_SCHEMA_VERSION = 1;
@@ -151,14 +148,17 @@ import {
   const boardSelector = document.getElementById("board-selector");
   const rotationLabel = document.getElementById("board-rotation-label");
   const rotationSelect = document.getElementById("board-rotation");
+  const inspectorMode = new URLSearchParams(window.location.search).get("inspect") === "1";
+  document.getElementById("board-inspector-controls").hidden = !inspectorMode;
   const connectedToggle = document.getElementById("connected-mode-toggle");
   const boardPicker = document.getElementById("board-picker");
   const boardPickerHint = document.getElementById("board-picker-hint");
   const boardPickerOptions = document.getElementById("board-picker-options");
   const boardPickerDescription = document.getElementById("board-picker-description");
   const boardPickerError = document.getElementById("board-picker-error");
-  const boardPickerGateStatus = document.getElementById("board-picker-gate-status");
-  const boardPickerGateAction = document.getElementById("board-picker-gate-action");
+  const boardManagement = document.getElementById("board-management");
+  const managementActions = document.getElementById("board-management-actions");
+  const managementFeedback = document.getElementById("board-management-feedback");
   const connectedHeaders = document.getElementById("connected-board-headers");
   const connectedBoardError = document.getElementById("connected-board-error");
   const calculationScopeNote = document.getElementById("calculation-scope-note");
@@ -436,13 +436,22 @@ import {
   let connectedSaveReadError = null;
   let storedConnectedDraft = null;
   let boardPickerGate = null;
+  let managedInstance = null;
+  let managementFocusGate = null;
+  let pendingBoardReset = null;
 
   function isConnectedMode() {
     return currentBoardKey === "connected";
   }
 
-  function opensGatePicker(node) {
-    return isConnectedMode() && Boolean(node.gateDirection);
+  function canAttachAtGate(node) {
+    return isConnectedMode() && node?.gateDirection && connectedLayout.boards.length < MAX_BOARDS
+      && !connectedLayout.gateOccupancy.has(node.id);
+  }
+
+  function freeBoardGates(board) {
+    return [...board.gates.keys()].map(index => boardNodes.get(`${board.instanceId}:${index}`))
+      .filter(canAttachAtGate);
   }
 
   function setStatus(message, isError) {
@@ -652,8 +661,8 @@ import {
     if (definition.isGate) {
       const direction = node.marker.dataset.gateDirection;
       addText(tooltip, "p", "tooltip-trait", direction ? `Board gate · ${direction}` : "Board gate");
-      if (opensGatePicker(node)) {
-        addText(tooltip, "p", "tooltip-trait", "Open the board picker for attachment and gate actions.");
+      if (canAttachAtGate(node)) {
+        addText(tooltip, "p", "tooltip-trait", "Use + beside this gate or its board menu to attach a board.");
       }
     }
   }
@@ -692,15 +701,14 @@ import {
   function applyTransform() {
     frame.style.transform = `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${zoom})`;
     if (isConnectedMode()) {
-      const boardWidth = CELL_SIZE * connectedLayout.boards[0].board.nWidth * zoom;
-      const compact = boardWidth < 280;
-      const headerScale = Math.min(1, boardWidth / (compact ? 150 : 280));
+      const compact = zoom < 0.6;
       connectedHeaders.classList.toggle("connected-headers--compact", compact);
       connectedHeaders.style.width = `${boardGrid.offsetWidth}px`;
       connectedHeaders.style.height = `${boardGrid.offsetHeight}px`;
       connectedHeaders.style.transform = frame.style.transform;
-      connectedHeaders.style.setProperty("--connected-header-scale", headerScale / zoom);
-      connectedHeaders.style.setProperty("--connected-header-gap", `${Math.max(6, CELL_SIZE * zoom * 0.8) / headerScale}px`);
+      const fit = Math.min(1 / zoom, (5 * CELL_SIZE - 6) / (compact ? 126 : 230));
+      connectedHeaders.style.setProperty("--connected-header-scale", fit);
+      connectedHeaders.style.setProperty("--gate-control-scale", Math.min(1 / zoom, (CELL_SIZE - 4) / 36));
     }
     if (activeTooltipMarker) {
       requestAnimationFrame(() => {
@@ -822,17 +830,24 @@ import {
     fitBoardView();
   }
 
-  function fittedBoardZoom() {
+  function connectedViewPadding() {
+    const style = getComputedStyle(stage);
+    return {
+      top: parseFloat(style.getPropertyValue("--connected-fit-top")),
+      bottom: parseFloat(style.getPropertyValue("--connected-fit-bottom"))
+    };
+  }
+
+  function fittedBoardZoom(padding) {
     const availableWidth = Math.max(100, stage.clientWidth - 48);
-    // Leave room above the fitted board grid for its headers.
-    const verticalPadding = isConnectedMode() ? CONNECTED_FIT_TOP + CONNECTED_FIT_BOTTOM : 48;
-    const availableHeight = Math.max(100, stage.clientHeight - verticalPadding);
+    const availableHeight = Math.max(100, stage.clientHeight - (padding ? padding.top + padding.bottom : 48));
     return Math.min(1, availableWidth / boardPixelWidth, availableHeight / boardPixelHeight);
   }
 
   function fitBoardView() {
-    zoom = fittedBoardZoom();
-    if (isConnectedMode()) panY = CONNECTED_FIT_PAN_Y;
+    const padding = isConnectedMode() ? connectedViewPadding() : null;
+    zoom = fittedBoardZoom(padding);
+    if (padding) panY = (padding.top - padding.bottom) / 2;
     applyTransform();
   }
 
@@ -844,48 +859,77 @@ import {
     }
   }
 
+  function controlButton(parent, caption, label) {
+    const button = addText(parent, "button", "", caption);
+    button.type = "button";
+    if (label) {
+      button.title = label;
+      button.setAttribute("aria-label", label);
+    }
+    return button;
+  }
+
   function renderConnectedHeaders(boards) {
-    const existing = new Map([...connectedHeaders.children].map(header => [header.dataset.instanceId, header]));
+    const existing = new Map([...connectedHeaders.querySelectorAll(".connected-board-header")]
+      .map(header => [header.dataset.instanceId, header]));
     const focused = document.activeElement;
-    const headers = boards.map(board => {
-      const config = BOARD_CONFIGS[board.boardId];
-      const [catalogLabel, name] = config.label.split(" — ");
-      const fixed = board.placementIndex === 0;
-      let header = existing.get(board.instanceId);
+    const controls = [];
+    for (const board of boards) {
+      const { instanceId, boardId, rotation, origin, placementIndex } = board;
+      const [, name] = BOARD_CONFIGS[boardId].label.split(" — ");
+      const freeGates = freeBoardGates(board);
+      const { management, attachments } = getBoardControlPositions(board.board, rotation,
+        freeGates.map(node => ({ id: node.id, x: node.displayPosition.x - origin.x, y: node.displayPosition.y - origin.y })));
+      let header = existing.get(instanceId);
       if (!header) {
         header = document.createElement("div");
-        header.className = `connected-board-header connected-board-header--${fixed ? "starting" : "additional"}`;
-        header.dataset.instanceId = board.instanceId;
-        header.dataset.boardId = board.boardId;
+        header.className = "connected-board-header";
+        header.dataset.instanceId = instanceId;
+        header.dataset.boardId = boardId;
         header.setAttribute("role", "group");
         header.setAttribute("aria-label", name);
         const title = addText(header, "h3", "", "");
         addText(title, "span", "", "");
         title.append(name);
-        if (!fixed) {
-          const controls = addText(header, "div", "connected-board-rotation", "");
-          const button = (symbol, label) => {
-            const control = addText(controls, "button", "", symbol);
-            control.type = "button";
-            control.title = label;
-            control.setAttribute("aria-label", label);
-            return control;
-          };
-          button("↺", `Rotate ${name} 90° counterclockwise`).dataset.rotationStep = "-90";
-          const angle = addText(controls, "output", "", "");
+        if (board.incoming) {
+          const rotationControls = addText(header, "div", "connected-board-rotation", "");
+          controlButton(rotationControls, "↶", `Rotate ${name} 90° counterclockwise`).dataset.rotationStep = "-90";
+          const angle = addText(rotationControls, "output", "", "");
           angle.setAttribute("aria-label", `${name} rotation`);
-          button("↻", `Rotate ${name} 90° clockwise`).dataset.rotationStep = "90";
-          button("×", `Remove ${name}`).dataset.removeBoard = "";
+          controlButton(rotationControls, "↷", `Rotate ${name} 90° clockwise`).dataset.rotationStep = "90";
         }
+        const menu = controlButton(header, "⋯", `Manage ${name}`);
+        menu.dataset.manageBoard = "";
+        menu.setAttribute("aria-haspopup", "dialog");
+        menu.setAttribute("aria-controls", boardManagement.id);
       }
-      header.querySelector("h3 span").textContent = `#${board.placementIndex + 1} · ${catalogLabel}`;
-      if (!fixed) header.querySelector("output").textContent = `${board.rotation}°`;
-      const anchor = fixed ? 0 : 0.5;
-      header.style.left = `${(board.origin.x + board.board.nWidth * anchor) * CELL_SIZE}px`;
-      header.style.top = `${board.origin.y * CELL_SIZE}px`;
-      return header;
-    });
-    connectedHeaders.replaceChildren(...headers);
+      header.querySelector("h3 span").textContent = `#${placementIndex + 1}`;
+      if (board.incoming) header.querySelector("output").textContent = `${rotation}°`;
+      const rightEdge = origin.x + management.x + management.columns;
+      header.style.right = `${(connectedLayout.width - rightEdge) * CELL_SIZE + 4}px`;
+      header.style.top = `${(origin.y + management.y) * CELL_SIZE + 4}px`;
+      header.style.setProperty("--connected-header-height-scale", (management.rows * CELL_SIZE - 6) / 42);
+      header.toggleAttribute("data-tight-inset", management.rows === 1);
+      controls.push(header);
+
+      for (const [id, spot] of attachments) {
+        const node = boardNodes.get(id);
+        const label = `Attach at ${name}'s ${node.gateDirection.toLowerCase()} gate`;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "gate-attachment";
+        button.textContent = "+";
+        button.title = label;
+        button.setAttribute("aria-label", label);
+        button.setAttribute("aria-haspopup", "dialog");
+        button.setAttribute("aria-controls", boardPicker.id);
+        button.dataset.attachGate = id;
+        button.style.left = `${(origin.x + spot.x + 0.5) * CELL_SIZE + 1}px`;
+        button.style.top = `${(origin.y + spot.y + 0.5) * CELL_SIZE + 1}px`;
+        controls.push(button);
+      }
+    }
+    connectedHeaders.replaceChildren(...controls);
     connectedHeaders.hidden = false;
     if (connectedHeaders.contains(focused)) focused.focus({ preventScroll: true });
   }
@@ -902,8 +946,9 @@ import {
     allocationRootId = root;
     allocatedNodeIds = connectedAllocation;
     rotationLabel.hidden = true;
-    boardPickerHint.hidden = false;
+    boardPickerHint.hidden = boards.length >= MAX_BOARDS;
     connectedToggle.setAttribute("aria-pressed", "true");
+    exportBuildButton.hidden = importBuildButton.hidden = !inspectorMode;
     exportBuildButton.disabled = true;
     importBuildButton.disabled = true;
     exportBuildButton.title = importBuildButton.title = "Build files are available in the Starting Board view.";
@@ -931,12 +976,12 @@ import {
     updateAllocationDisplay();
   }
 
-  function writeConnectedDraft() {
+  function writeConnectedDraft(allocations = connectedAllocation) {
     if (connectedSaveReadError) throw new Error("The existing connected save could not be read and was preserved.");
     if (window.localStorage.getItem(CONNECTED_SAVE_KEY_V2) !== storedConnectedDraft) {
       throw new Error("The stored connected draft changed. Reload before saving again.");
     }
-    const serialized = JSON.stringify(writeConnectedSaveV2(connectedLayout, connectedAllocation));
+    const serialized = JSON.stringify(writeConnectedSaveV2(connectedLayout, allocations));
     window.localStorage.setItem(CONNECTED_SAVE_KEY_V2, serialized);
     storedConnectedDraft = serialized;
   }
@@ -966,7 +1011,7 @@ import {
     panX = panY = 0;
     renderConnectedLayout();
     fitBoardView();
-    setConnectedLocation(true);
+    if (inspectorMode) setConnectedLocation(true);
     if (connectedSaveReadError) {
       setSaveStatus("Connected save unavailable", "error");
       setAllocationMessage(`Connected save could not be restored: ${connectedSaveReadError.message}`, true);
@@ -978,7 +1023,8 @@ import {
     }
     setSaveStatus(storedConnectedDraft !== null ? "Connected draft restored" : "Separate connected draft",
       storedConnectedDraft !== null ? "saved" : "unsaved");
-    setAllocationMessage("Open a gate to choose a board or manage its allocation.");
+    setAllocationMessage(connectedLayout.boards.length < MAX_BOARDS
+      ? "Use + beside a free gate to attach a board." : "All five board positions are equipped.");
   }
 
   function saveConnectedAllocation(change) {
@@ -1013,21 +1059,21 @@ import {
     if (saveAllocation("Layout")) setAllocationMessage(message);
   }
 
-  function boardChangeError(error) {
+  function boardChangeError(error, showInCanvas = true) {
     const message = `Attachment change rejected: ${error.message}`;
     setAllocationMessage(message, true);
     connectedBoardError.textContent = message;
-    connectedBoardError.hidden = false;
+    connectedBoardError.hidden = !showInCanvas;
   }
 
-  function positionBoardPicker() {
+  function positionBoardDialog(dialog) {
     const bounds = stage.getBoundingClientRect();
     const left = Math.max(0, bounds.left);
     const top = Math.max(0, bounds.top);
     const right = Math.min(document.documentElement.clientWidth, bounds.right);
     const bottom = Math.min(document.documentElement.clientHeight, bounds.bottom);
     const height = Math.max(0, bottom - top);
-    Object.assign(boardPicker.style, {
+    Object.assign(dialog.style, {
       left: `${left}px`,
       top: `${top}px`,
       width: `${Math.max(0, right - left)}px`,
@@ -1036,29 +1082,19 @@ import {
     return height;
   }
 
-  function openBoardPicker(node) {
-    if (boardPicker.open) return;
-    boardPickerGate = node;
-    const isAllocated = allocatedNodeIds.has(node.id);
-    const canAllocate = getEligibleNodeIds().has(node.id);
-    boardPickerGateAction.textContent = isAllocated ? "Refund gate" : "Allocate gate · 1 point";
-    boardPickerGateAction.disabled = !isAllocated && !canAllocate;
-    boardPickerGateStatus.textContent = isAllocated
-      ? "Gate allocated. Refunds must keep your path connected."
-      : canAllocate
-        ? "Allocating this gate costs one point."
-        : "Allocate a connected path to this gate to unlock its allocation.";
-    const attachment = connectedLayout.gateOccupancy.get(node.id);
-    const full = connectedLayout.boards.length >= MAX_BOARDS;
-    const gateLabel = `${BOARD_CONFIGS[node.boardId].label} · ${node.gateDirection} gate.`;
-    let reason = "Choose an unused board. Attachment costs no points.";
-    if (attachment) {
-      const other = connectedLayout.nodes.get(attachment.parentGateId === node.id ? attachment.entryGateId : attachment.parentGateId);
-      reason = `Connected to ${BOARD_CONFIGS[other.boardId].label} at its ${other.gateDirection.toLowerCase()} gate.`;
-    } else if (full) {
-      reason = "All five board positions are occupied.";
+  function showBoardDialog(dialog, minimumHeight) {
+    hideTooltip();
+    if (positionBoardDialog(dialog) < Math.min(minimumHeight, stage.clientHeight)) {
+      stage.scrollIntoView({ block: "center" });
+      positionBoardDialog(dialog);
     }
-    boardPickerDescription.textContent = `${gateLabel} ${reason}`;
+    dialog.showModal();
+  }
+
+  function openBoardPicker(node) {
+    if (boardPicker.open || !canAttachAtGate(node)) return;
+    boardPickerGate = node;
+    boardPickerDescription.textContent = `${BOARD_CONFIGS[node.boardId].label} · ${node.gateDirection} gate. Choose an unused board. Attachment costs no points.`;
     boardPickerError.hidden = true;
     connectedBoardError.hidden = true;
     const equipped = new Set(connectedLayout.boards.map(board => board.boardId));
@@ -1066,17 +1102,95 @@ import {
       const boardId = option.dataset.boardId;
       const optionReason = equipped.has(boardId) ? "Equipped" : !boardResources.has(boardId) ? "Data unavailable" : "";
       option.querySelector("span").textContent = optionReason;
-      option.disabled = Boolean(optionReason || attachment || full);
+      option.disabled = Boolean(optionReason);
     }
-    hideTooltip();
-    if (positionBoardPicker() < Math.min(360, stage.clientHeight)) {
-      stage.scrollIntoView({ block: "center" });
-      positionBoardPicker();
+    showBoardDialog(boardPicker, 360);
+    boardPickerOptions.querySelector("button:enabled")?.focus({ preventScroll: true });
+  }
+
+  function managementButton(instanceId) {
+    return connectedHeaders.querySelector(`[data-instance-id="${CSS.escape(instanceId)}"] [data-manage-board]`);
+  }
+
+  function boardName(instanceId) {
+    const board = connectedLayout.boards.find(instance => instance.instanceId === instanceId);
+    return BOARD_CONFIGS[board.boardId].label.split(" — ")[1];
+  }
+
+  function showManagementFeedback(message) {
+    managementFeedback.textContent = message;
+    managementFeedback.hidden = !message;
+  }
+
+  function renderManagementActions(board, focusReset = false) {
+    managementActions.replaceChildren();
+    showManagementFeedback("");
+    const name = boardName(board.instanceId);
+    document.getElementById("board-management-title").textContent = `#${board.placementIndex + 1} ${name}${board.incoming ? ` · ${board.rotation}°` : ""}`;
+    if (board.incoming) {
+      controlButton(managementActions, "Rotate 90° counterclockwise").dataset.rotationStep = "-90";
+      controlButton(managementActions, "Rotate 90° clockwise").dataset.rotationStep = "90";
     }
-    boardPicker.showModal();
-    const firstAvailable = boardPickerOptions.querySelector("button:enabled");
-    (firstAvailable || (boardPickerGateAction.disabled ? boardPicker.querySelector("#board-picker-close") : boardPickerGateAction))
-      .focus({ preventScroll: true });
+    const reset = controlButton(managementActions, "Reset this board’s points");
+    reset.dataset.resetBoard = "";
+    const hasPoints = [...allocatedNodeIds].some(id => id !== connectedLayout.root && boardNodes.get(id).instanceId === board.instanceId);
+    reset.disabled = !hasPoints;
+    if (!hasPoints) showManagementFeedback("This board has no points to refund.");
+    if (board.incoming && !hasPoints && !connectedLayout.attachments.some(edge => edge.parentInstanceId === board.instanceId)) {
+      controlButton(managementActions, "Remove this board").dataset.removeBoard = "";
+    }
+    for (const gate of freeBoardGates(board)) {
+      controlButton(managementActions, `Attach at ${gate.gateDirection.toLowerCase()} gate`).dataset.attachGate = gate.id;
+    }
+    if (focusReset) reset.focus({ preventScroll: true });
+  }
+
+  function openBoardManagement(instanceId) {
+    const board = connectedLayout.boards.find(instance => instance.instanceId === instanceId);
+    managedInstance = instanceId;
+    managementFocusGate = null;
+    pendingBoardReset = null;
+    connectedBoardError.hidden = true;
+    renderManagementActions(board);
+    showBoardDialog(boardManagement, 300);
+  }
+
+  function previewBoardReset(board) {
+    const { candidate, refunded, dependentBoards } = planConnectedBoardReset(connectedLayout, allocatedNodeIds, board.instanceId);
+    const name = boardName(board.instanceId);
+    if (dependentBoards.size) {
+      const names = new Intl.ListFormat("en").format([...dependentBoards].map(boardName));
+      showManagementFeedback(`Cannot reset ${name}. Allocated nodes on ${names} depend on its path. Refund those nodes first.`);
+      return;
+    }
+    if (!refunded) return;
+    pendingBoardReset = candidate;
+    showManagementFeedback(`Reset ${name} and refund ${refunded} ${refunded === 1 ? "point" : "points"}?`);
+    managementActions.replaceChildren();
+    controlButton(managementActions, "Refund points").dataset.confirmReset = "";
+    const cancel = controlButton(managementActions, "Cancel");
+    cancel.dataset.cancelReset = "";
+    cancel.focus({ preventScroll: true });
+  }
+
+  function commitBoardReset(board) {
+    try {
+      writeConnectedDraft(pendingBoardReset);
+    } catch (error) {
+      showManagementFeedback(`Could not reset ${boardName(board.instanceId)}. ${error.message}`);
+      return;
+    }
+    const refunded = allocatedNodeIds.size - pendingBoardReset.size;
+    allocatedNodeIds = connectedAllocation = pendingBoardReset;
+    updateAllocationDisplay();
+    setSaveStatus("Connected draft saved locally", "saved");
+    setAllocationMessage(`Refunded ${refunded} ${refunded === 1 ? "point" : "points"} on ${boardName(board.instanceId)}.`);
+    boardManagement.close();
+  }
+
+  function rotateBoardFromControl(board, step) {
+    const candidate = rotateConnectedBoard(boardResources, connectedLayout, allocatedNodeIds, board.instanceId, step);
+    commitConnectedLayout(candidate, `${BOARD_CONFIGS[board.boardId].label} rotated.`, false);
   }
 
   function createBoardGrid(width, height, label) {
@@ -1116,7 +1230,6 @@ import {
     }
 
     const { id, definition, boardId, instanceId } = node;
-    const opensBoardPicker = opensGatePicker(node);
     const marker = document.createElement("span");
     marker.className = `node node--${definition.kind}`;
     marker.dataset.nodeIndex = String(node.sourceIndex ?? id);
@@ -1126,19 +1239,14 @@ import {
     if (node.gateDirection) marker.dataset.gateDirection = node.gateDirection;
     marker.setAttribute("role", "button");
     marker.setAttribute("aria-describedby", tooltip.id);
-    if (opensBoardPicker) {
-      marker.setAttribute("aria-haspopup", "dialog");
-      marker.setAttribute("aria-controls", boardPicker.id);
-    } else {
-      marker.setAttribute("aria-pressed", "false");
-    }
+    marker.setAttribute("aria-pressed", "false");
+    marker.setAttribute("aria-keyshortcuts", "Enter Space Delete");
     marker.tabIndex = 0;
     node.marker = marker;
     cell.setAttribute("aria-label", definition.name);
-    const activate = opensBoardPicker ? () => openBoardPicker(node) : () => allocateNode(id);
     marker.addEventListener("click", event => {
       event.stopPropagation();
-      if (event.button === 0) activate();
+      if (event.button === 0) allocateNode(id);
     });
     marker.addEventListener("contextmenu", event => {
       event.preventDefault();
@@ -1146,10 +1254,11 @@ import {
       refundNode(id);
     });
     marker.addEventListener("keydown", event => {
-      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.key !== "Enter" && event.key !== " " && event.key !== "Delete") return;
       event.preventDefault();
       event.stopPropagation();
-      activate();
+      if (event.key === "Delete") refundNode(id);
+      else allocateNode(id);
     });
     marker.addEventListener("pointerenter", () => showTooltip(node));
     marker.addEventListener("pointerleave", () => {
@@ -1544,12 +1653,10 @@ import {
       const isEligible = eligibleNodeIds.has(id);
       node.marker.classList.toggle("node--allocated", isAllocated);
       node.marker.classList.toggle("node--eligible", isEligible);
-      const opensBoardPicker = opensGatePicker(node);
-      if (!opensBoardPicker) node.marker.setAttribute("aria-pressed", String(isAllocated));
+      node.marker.setAttribute("aria-pressed", String(isAllocated));
       const state = isAllocated ? "allocated" : isEligible ? "eligible to allocate" : "not connected to the allocated path";
       const boardLabel = node.boardId ? `${BOARD_CONFIGS[node.boardId].label}, ` : "";
-      const action = opensBoardPicker ? ", open board picker" : "";
-      node.marker.setAttribute("aria-label", `${boardLabel}${node.definition.name}, ${KIND_LABELS[node.definition.kind] || "node"}, ${state}${action}`);
+      node.marker.setAttribute("aria-label", `${boardLabel}${node.definition.name}, ${KIND_LABELS[node.definition.kind] || "node"}, ${state}`);
     }
 
     pointsSpent.textContent = String(spent);
@@ -1757,6 +1864,7 @@ import {
   }
 
   connectedToggle.addEventListener("click", () => {
+    if (!inspectorMode) return;
     if (isConnectedMode()) {
       boardSelector.dispatchEvent(new Event("change"));
     } else {
@@ -1778,7 +1886,8 @@ import {
     const instanceId = `${boardId}-${crypto.getRandomValues(new Uint32Array(4)).join("-")}`;
     try {
       const candidate = attachBoard(boardResources, connectedLayout, allocatedNodeIds, boardPickerGate.id, boardId, instanceId);
-      const fit = panX === 0 && panY === CONNECTED_FIT_PAN_Y && zoom === fittedBoardZoom();
+      const padding = connectedViewPadding();
+      const fit = panX === 0 && panY === (padding.top - padding.bottom) / 2 && zoom === fittedBoardZoom(padding);
       commitConnectedLayout(candidate, `${BOARD_CONFIGS[boardId].label} attached.`, fit);
       boardPicker.close();
     } catch (error) {
@@ -1787,45 +1896,75 @@ import {
     }
   });
   document.getElementById("board-picker-close").addEventListener("click", () => boardPicker.close());
-  boardPicker.addEventListener("click", (event) => {
-    if (event.target === boardPicker) boardPicker.close();
-  });
+  for (const dialog of [boardPicker, boardManagement]) {
+    dialog.addEventListener("click", event => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("wheel", event => {
+      if (event.target === dialog) event.preventDefault();
+    }, { passive: false });
+  }
   boardPicker.addEventListener("close", () => {
     if (boardPicker.open) return;
-    const marker = boardNodes.get(boardPickerGate?.id)?.marker;
-    boardPickerGate = null;
-    if (marker?.isConnected) {
-      marker.focus({ preventScroll: true });
-      if (!marker.matches(":focus-visible")) hideTooltip();
-    }
-  });
-  boardPicker.addEventListener("wheel", (event) => {
-    if (event.target === boardPicker) event.preventDefault();
-  }, { passive: false });
-  boardPickerGateAction.addEventListener("click", () => {
-    if (!boardPicker.open) return;
     const { id } = boardPickerGate;
-    if (allocatedNodeIds.has(id)) refundNode(id);
-    else allocateNode(id);
-    boardPicker.close();
+    boardPickerGate = null;
+    const attachment = connectedHeaders.querySelector(`[data-attach-gate="${CSS.escape(id)}"]`);
+    const target = attachment || boardNodes.get(id)?.marker;
+    target?.focus({ preventScroll: true });
+    if (target && !target.matches(":focus-visible")) hideTooltip();
+  });
+  document.getElementById("board-management-close").addEventListener("click", () => boardManagement.close());
+  boardManagement.addEventListener("close", () => {
+    if (boardManagement.open) return;
+    const target = managementFocusGate ? boardNodes.get(managementFocusGate)?.marker : managementButton(managedInstance);
+    managedInstance = null;
+    pendingBoardReset = null;
+    if (!boardPicker.open) target?.focus({ preventScroll: true });
+  });
+  managementActions.addEventListener("click", event => {
+    const button = event.target.closest("button:enabled");
+    if (!button || !boardManagement.open) return;
+    const board = connectedLayout.boards.find(instance => instance.instanceId === managedInstance);
+    try {
+      if (button.hasAttribute("data-reset-board")) previewBoardReset(board);
+      else if (button.hasAttribute("data-cancel-reset")) {
+        pendingBoardReset = null;
+        renderManagementActions(board, true);
+      } else if (button.hasAttribute("data-confirm-reset")) commitBoardReset(board);
+      else if (button.hasAttribute("data-attach-gate")) {
+        boardManagement.close();
+        openBoardPicker(boardNodes.get(button.dataset.attachGate));
+      } else if (button.hasAttribute("data-remove-board")) {
+        const candidate = removeConnectedBoard(boardResources, connectedLayout, allocatedNodeIds, board.instanceId);
+        if (!window.confirm(`Remove ${boardName(board.instanceId)}?`)) return;
+        managementFocusGate = connectedLayout.attachments.find(edge => edge.childInstanceId === board.instanceId).parentGateId;
+        commitConnectedLayout(candidate, `${boardName(board.instanceId)} removed.`, false);
+        boardManagement.close();
+      } else {
+        rotateBoardFromControl(board, Number(button.dataset.rotationStep));
+        renderManagementActions(connectedLayout.boards.find(instance => instance.instanceId === board.instanceId));
+        managementActions.querySelector(`[data-rotation-step="${button.dataset.rotationStep}"]`).focus({ preventScroll: true });
+      }
+    } catch (error) {
+      boardChangeError(error, false);
+      showManagementFeedback(error.message);
+    }
   });
   connectedHeaders.addEventListener("click", event => {
     const button = event.target.closest("button");
     if (!button) return;
-    const { instanceId, boardId } = button.closest(".connected-board-header").dataset;
-    const label = BOARD_CONFIGS[boardId].label;
+    if (button.hasAttribute("data-attach-gate")) {
+      openBoardPicker(boardNodes.get(button.dataset.attachGate));
+      return;
+    }
+    const { instanceId } = button.closest(".connected-board-header").dataset;
+    if (button.hasAttribute("data-manage-board")) {
+      openBoardManagement(instanceId);
+      return;
+    }
+    const board = connectedLayout.boards.find(instance => instance.instanceId === instanceId);
     try {
-      if (button.hasAttribute("data-remove-board")) {
-        const candidate = removeConnectedBoard(boardResources, connectedLayout, allocatedNodeIds, instanceId);
-        if (!window.confirm(`Remove ${label}?`)) return;
-        const edge = connectedLayout.attachments.find(attachment => attachment.childInstanceId === instanceId);
-        commitConnectedLayout(candidate, `${label} removed.`, false);
-        boardNodes.get(edge.parentGateId)?.marker?.focus({ preventScroll: true });
-      } else {
-        const step = Number(button.dataset.rotationStep);
-        const candidate = rotateConnectedBoard(boardResources, connectedLayout, allocatedNodeIds, instanceId, step);
-        commitConnectedLayout(candidate, `${label} rotated.`, false);
-      }
+      rotateBoardFromControl(board, Number(button.dataset.rotationStep));
     } catch (error) {
       boardChangeError(error);
     }
@@ -1893,13 +2032,13 @@ import {
 
   stage.addEventListener("wheel", (event) => {
     event.preventDefault();
-    if (event.target.closest(".connected-board-header")) return;
+    if (event.target.closest(".connected-board-header, .gate-attachment")) return;
     setZoom(zoom + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP));
   }, { passive: false });
 
   stage.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
-    if (event.target.closest(".node, .connected-board-header")) return;
+    if (event.target.closest(".node, .connected-board-header, .gate-attachment")) return;
     if (isConnectedMode()) hideTooltip();
     drag = { x: event.clientX, y: event.clientY, panX, panY };
     stage.setPointerCapture(event.pointerId);
@@ -1924,10 +2063,10 @@ import {
   });
   window.addEventListener("resize", () => {
     if (activeTooltipMarker) positionTooltip(activeTooltipMarker);
-    if (boardPicker.open) positionBoardPicker();
+    for (const dialog of [boardPicker, boardManagement]) if (dialog.open) positionBoardDialog(dialog);
   });
   window.addEventListener("scroll", () => {
-    if (boardPicker.open) positionBoardPicker();
+    for (const dialog of [boardPicker, boardManagement]) if (dialog.open) positionBoardDialog(dialog);
   });
 
   async function loadBoardResource(boardKey) {
@@ -1947,7 +2086,9 @@ import {
     try {
       const startingBoard = await loadBoardResource("board00");
       boardResources.set("board00", startingBoard);
-      renderBoard("board00", startingBoard.board, startingBoard.database);
+      if (inspectorMode && window.location.hash !== "#connected") {
+        renderBoard("board00", startingBoard.board, startingBoard.database);
+      }
     } catch (error) {
       console.error("Could not load the starting Paragon board:", error);
       setStatus(`Could not load Board 00 data. Serve the project over HTTP and check the local JSON files. (${error.message})`, true);
@@ -1965,6 +2106,6 @@ import {
       }
     }));
     connectedToggle.disabled = false;
-    if (window.location.hash === "#connected") openConnectedMode();
+    if (!inspectorMode || window.location.hash === "#connected") openConnectedMode();
   })();
 })();

@@ -305,6 +305,19 @@ export function validateConnectedAllocation(layout, allocated) {
   }
 }
 
+export function planConnectedBoardReset(layout, allocated, instanceId) {
+  if (!layout.boards.some(board => board.instanceId === instanceId)) {
+    throw new Error("Choose an equipped board.");
+  }
+  const candidate = new Set([...allocated].filter(id =>
+    id === layout.root || layout.nodes.get(id).instanceId !== instanceId));
+  const reached = reachableAllocations(layout.graph, candidate, layout.root);
+  const dependentBoards = new Set([...candidate].filter(id => !reached.has(id))
+    .map(id => layout.nodes.get(id).instanceId));
+  if (!dependentBoards.size) validateConnectedAllocation(layout, candidate);
+  return { candidate, refunded: allocated.size - candidate.size, dependentBoards };
+}
+
 export function readConnectedSave(resources, saved) {
   if (saved?.version !== 1 || saved.sourceRevision !== SOURCE_REVISION || !Array.isArray(saved.allocations)) {
     throw new Error("The Connected Boards save has an unsupported schema or source revision.");

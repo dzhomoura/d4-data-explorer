@@ -3,9 +3,10 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   attachBoard, buildBoardInstanceLayout, buildConnectedLayout, calculateConnectedBonuses, createStartingLayout,
-  DEFAULT_ATTACHMENT, readConnectedSave, readConnectedSaveV2, reachableAllocations, removeConnectedBoard,
+  DEFAULT_ATTACHMENT, planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, reachableAllocations, removeConnectedBoard,
   rotateConnectedBoard, validateConnectedAllocation, writeConnectedSave, writeConnectedSaveV2
 } from "../paragon-visual/connected-boards.js";
+import { BOARD_ROTATIONS, getBoardControlPositions, rotateBoardPoint } from "../paragon-visual/board-rotation.js";
 import { mergeSharedNodeDefinitions } from "../paragon-visual/shared-node-definitions.js";
 import { calculateParagonBonuses } from "../paragon-visual/paragon-calculator.js";
 
@@ -307,4 +308,64 @@ test("version 2 preserves the branch, rotations, allocations and legacy calculat
   assert.deepEqual(migrated.layout.boards.map(board => board.rotation), [0, 270]);
   assert.deepEqual(calculateConnectedBonuses(migrated.layout, migrated.allocated, zero),
     calculateConnectedBonuses(legacy, olderAllocation, zero));
+});
+
+test("top-right toolbar reservations fit every pinned board and orientation without covering nodes or gates", () => {
+  for (const [boardId, { board }] of resources) {
+    const rotations = boardId === "board00" ? [0] : BOARD_ROTATIONS;
+    for (const rotation of rotations) {
+      const cells = board.arEntries.flatMap((entry, index) => {
+        if (!entry) return [];
+        return [{ ...rotateBoardPoint(index % board.nWidth, Math.floor(index / board.nWidth), board.nWidth, rotation),
+          id: String(index), gate: entry.name.includes("Generic_Gate") }];
+      });
+      const gates = cells.filter(cell => cell.gate);
+      assert.equal(gates.length, boardId === "board00" ? 1 : 4);
+      const { management, attachments } = getBoardControlPositions(board, rotation, gates);
+      assert.equal(attachments.size, gates.length);
+      assert.equal(management.x + management.columns, board.nWidth);
+      assert.equal(management.y, 0);
+      assert.ok(management.rows === 1 || management.rows === 2);
+      const reserved = new Set(cells.map(({ x, y }) => `${x},${y}`));
+      const reserve = ({ x, y }) => {
+        assert.ok(x >= 0 && x < board.nWidth && y >= 0 && y < board.nWidth);
+        const key = `${x},${y}`;
+        assert.ok(!reserved.has(key), `${boardId}, ${rotation}° at ${key}`);
+        reserved.add(key);
+      };
+      for (const gate of gates) {
+        const spot = attachments.get(gate.id);
+        assert.equal(Math.abs(spot.x - gate.x) + Math.abs(spot.y - gate.y), 1);
+        reserve(spot);
+      }
+      for (let y = management.y; y < management.y + management.rows; y++) {
+        for (let x = management.x; x < management.x + management.columns; x++) reserve({ x, y });
+      }
+    }
+  }
+});
+
+test("board reset plans preserve the root and reject dependent branches without editing allocations", () => {
+  const { layout, allocated } = attachPlan(fiveBoardPlan);
+  assert.equal(planConnectedBoardReset(layout, allocated, "castle").refunded, 0);
+  const emptyStarting = planConnectedBoardReset(layout, allocated, layout.boards[0].instanceId);
+  assert.equal(emptyStarting.refunded, 0);
+  assert.deepEqual(emptyStarting.candidate, new Set([layout.root]));
+  allocatePath(layout, allocated, "fervent:178");
+  allocatePath(layout, allocated, "endure:326");
+  const before = new Set(allocated);
+  assert.deepEqual(planConnectedBoardReset(layout, allocated, "castle").dependentBoards, new Set(["fervent", "endure"]));
+  assert.deepEqual(planConnectedBoardReset(layout, allocated, layout.boards[0].instanceId).dependentBoards,
+    new Set(["castle", "fervent", "endure"]));
+  assert.deepEqual(allocated, before);
+
+  const leaf = planConnectedBoardReset(layout, allocated, "fervent");
+  assert.equal(leaf.dependentBoards.size, 0);
+  assert.deepEqual(leaf.candidate, new Set([...before].filter(id => !id.startsWith("fervent:"))));
+  assert.equal(leaf.refunded, before.size - leaf.candidate.size);
+  validateConnectedAllocation(layout, leaf.candidate);
+  const safeStarting = planConnectedBoardReset(layout, new Set([layout.root, "board00:283"]), "board00");
+  assert.deepEqual(safeStarting.candidate, new Set([layout.root]));
+  assert.equal(safeStarting.refunded, 1);
+  assert.throws(() => planConnectedBoardReset(layout, allocated, "missing"), /equipped board/);
 });
