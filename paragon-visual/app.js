@@ -40,7 +40,8 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       boardEquipIndex: 2,
       requiresEntryGate: true,
       supportsBuildFiles: false,
-      calculationScope: "Board 02 resolves shared Normal/Gate +5 core attributes; selected shared Magic bonuses including +100 flat Thorns; direct Stalwart, Growth, and Constrict bonuses; base-only Knight bonuses; and planner-observed Bludgeoning/Bodyguard base and threshold bonuses. Remaining Magic effects, thresholds, and the legendary power remain unresolved."
+      observedRareThresholds: true,
+      calculationScope: "Shield Bearer resolves ordinary node bonuses and all six observed Rare thresholds at equip index 2. The Legendary power remains unresolved."
     }),
     board03: Object.freeze({
       label: "Board 03 — Fervent",
@@ -84,6 +85,39 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       supportsBuildFiles: false,
       observedRareThresholds: true,
       calculationScope: "Relentless resolves ordinary node bonuses and all six observed Rare thresholds at equip index 6. The Legendary power remains unresolved."
+    }),
+    board07: Object.freeze({
+      label: "Board 07 — Sentencing",
+      boardUrl: "../paladin-board-07.json",
+      nodeDatabaseUrl: "node-data-07.json",
+      storageKey: "d4-paragon-paladin-07-v1",
+      boardEquipIndex: 7,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      unverifiedRareThresholds: true,
+      calculationScope: "Sentencing reuses verified values for matching nodes. Some Magic and Rare base bonuses, all Rare conditionals, and the Legendary power remain unresolved."
+    }),
+    board08: Object.freeze({
+      label: "Board 08 — Endure",
+      boardUrl: "../paladin-board-08.json",
+      nodeDatabaseUrl: "node-data-08.json",
+      storageKey: "d4-paragon-paladin-08-v1",
+      boardEquipIndex: 8,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      unverifiedRareThresholds: true,
+      calculationScope: "Endure reuses verified core formulas and matching Magic bonuses. Some Magic bonuses, all Rare bonuses, and the Legendary power remain unresolved."
+    }),
+    board09: Object.freeze({
+      label: "Board 09 — Beacon",
+      boardUrl: "../paladin-board-09.json",
+      nodeDatabaseUrl: "node-data-09.json",
+      storageKey: "d4-paragon-paladin-09-v1",
+      boardEquipIndex: 9,
+      requiresEntryGate: true,
+      supportsBuildFiles: false,
+      unverifiedRareThresholds: true,
+      calculationScope: "Beacon reuses verified values for matching nodes. Some Magic and Rare base bonuses, all Rare conditionals, and the Legendary power remain unresolved."
     })
   });
   const POINT_COSTS = Object.freeze({
@@ -502,7 +536,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
           ? evaluation.requirements
             ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
             : `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
-          : evaluation
+          : evaluation || currentBoardConfig.unverifiedRareThresholds
             ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
             : `${threshold.name}: not evaluated`;
         const className = evaluation?.resolved
@@ -511,17 +545,20 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
         addText(list, "li", className, label);
       }
       thresholds.appendChild(list);
-      addText(
-        thresholds,
-        "p",
-        "tooltip-formula-note",
-        currentBoardConfig.observedRareThresholds
+      const thresholdNote = currentBoardConfig.unverifiedRareThresholds
+        ? "This board’s Rare conditional amounts and requirements remain unverified."
+        : currentBoardConfig.observedRareThresholds
           ? `Rare thresholds use total attributes and the observed equip-index-${currentBoardConfig.boardEquipIndex} requirements.`
           : currentBoardKey === "board00"
             ? "Only the in-game verified starting-board requirement is evaluated."
             : currentBoardKey === "board03"
               ? "Fervent thresholds use total attributes and the observed equip-index-3 requirements."
-              : "Castle thresholds are evaluated only for the observed equip-index-1 context."
+              : "Castle thresholds are evaluated only for the observed equip-index-1 context.";
+      addText(
+        thresholds,
+        "p",
+        "tooltip-formula-note",
+        thresholdNote
       );
       tooltip.appendChild(thresholds);
     }
@@ -1445,7 +1482,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       setAllocationMessage(`Board 03 could not be loaded. (${error.message})`, true);
     }
 
-    for (const boardKey of ["board04", "board05", "board06"]) {
+    for (const boardKey of ["board04", "board05", "board06", "board07", "board08", "board09"]) {
       const { label } = BOARD_CONFIGS[boardKey];
       try {
         const resource = await loadBoardResource(boardKey);

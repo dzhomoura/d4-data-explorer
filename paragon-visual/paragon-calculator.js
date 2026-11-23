@@ -1,10 +1,13 @@
 import {
+  BEACON_BONUS_REGISTRY,
   CASTLE_BONUS_REGISTRY,
   DIVINITY_BONUS_REGISTRY,
+  ENDURE_BONUS_REGISTRY,
   FERVENT_BONUS_REGISTRY,
   PARAGON_BONUS_REGISTRY,
   PREACHER_BONUS_REGISTRY,
   RELENTLESS_BONUS_REGISTRY,
+  SENTENCING_BONUS_REGISTRY,
   SHIELD_BEARER_BONUS_REGISTRY
 } from "./paragon-bonus-registry.js";
 
@@ -44,7 +47,10 @@ const BOARD_BONUS_REGISTRIES = Object.freeze({
   [FERVENT_BONUS_REGISTRY.boardSnoId]: FERVENT_BONUS_REGISTRY,
   [PREACHER_BONUS_REGISTRY.boardSnoId]: PREACHER_BONUS_REGISTRY,
   [DIVINITY_BONUS_REGISTRY.boardSnoId]: DIVINITY_BONUS_REGISTRY,
-  [RELENTLESS_BONUS_REGISTRY.boardSnoId]: RELENTLESS_BONUS_REGISTRY
+  [RELENTLESS_BONUS_REGISTRY.boardSnoId]: RELENTLESS_BONUS_REGISTRY,
+  [SENTENCING_BONUS_REGISTRY.boardSnoId]: SENTENCING_BONUS_REGISTRY,
+  [ENDURE_BONUS_REGISTRY.boardSnoId]: ENDURE_BONUS_REGISTRY,
+  [BEACON_BONUS_REGISTRY.boardSnoId]: BEACON_BONUS_REGISTRY
 });
 const ZERO_EXTERNAL_ATTRIBUTES = Object.freeze({
   Strength: 0,
@@ -394,7 +400,10 @@ export function calculateParagonBonuses(
               : definition.thresholdReferences.length > 0
                 ? "Thresholded attribute is not in the observed bonus registry."
                 : "Node formula metadata does not match the verified numerical value.";
-        addUnresolved(index, definition, attribute, attributeIndex, reason, definition.thresholdReferences.length > 0);
+        const hasUnresolvedConditional = candidateRegistry?.unverifiedRareThresholds
+          ? definition.ptBonusAttributeIndices?.includes(attributeIndex)
+          : definition.thresholdReferences.length > 0;
+        addUnresolved(index, definition, attribute, attributeIndex, reason, hasUnresolvedConditional);
         continue;
       }
 
@@ -460,7 +469,8 @@ export function calculateParagonBonuses(
       const resultAttribute = CORE_ATTRIBUTES[attribute.name];
       let record = registered && !registered.invalid ? registered.record : null;
       let unconditional = null;
-      let conditional = 0;
+      let conditional = candidateRegistry?.unverifiedRareThresholds
+        && definition.ptBonusAttributeIndices?.includes(attributeIndex) ? null : 0;
       let provenance = null;
 
       if (record) {

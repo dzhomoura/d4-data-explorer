@@ -462,17 +462,22 @@ export const SHIELD_BEARER_BONUS_REGISTRY = {
       ],
       observedBoardEquipIndex: 2,
       provenance: UNAMPLIFIED_PLANNER
+    },
+    "Paladin_Strength+Willpower": {
+      snoId: 2504901,
+      combination: "all",
+      requirements: [
+        { requiredAttribute: "Strength", requiredAttributeId: 18, requiredValue: 1155 },
+        { requiredAttribute: "Willpower", requiredAttributeId: 20, requiredValue: 260 }
+      ],
+      observedBoardEquipIndex: 2,
+      provenance: DIRECT_IN_GAME
     }
   },
   reuseNodeRecords: [
     {
       sourceBoardSnoId: 2436511,
       nodeSnoIds: [2063114, 678822, 678792]
-    },
-    {
-      sourceBoardSnoId: 2436511,
-      nodeSnoIds: [2449723],
-      baseOnly: true
     }
   ],
   nodes: {
@@ -492,6 +497,16 @@ export const SHIELD_BEARER_BONUS_REGISTRY = {
       attributes: [
         { attributeIndex: 0, attributeId: 331, attributeName: "Block_Chance", formulaReference: "ParagonNodeBlockChance_RareMinor", category: "blockChance", base: 2.5, conditional: 2.5, thresholdReference: "WillPowerSide3", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
         { attributeIndex: 1, attributeId: 335, attributeName: "Block_Damage_Percent_Bonus", formulaReference: "ParagonNodeDamageBonusDot_RareMajor", category: "blockedDamageReduction", base: 15, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
+    },
+    "2449723": {
+      name: "Paladin_Rare_010",
+      displayName: "Knight",
+      sourcePath: "json/base/meta/ParagonNode/Paladin_Rare_010.pgn.json",
+      ptBonusAttributeIndices: [0],
+      attributes: [
+        { attributeIndex: 0, attributeId: 254, attributeName: "Damage_Type_Percent_Bonus", attributeParam: 0, formulaReference: "ParagonNodeDamageBonus_RareMajor", category: "physicalDamage", base: 10, conditional: 10, thresholdReference: "Paladin_Strength+Willpower", provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION },
+        { attributeIndex: 1, attributeId: 9, attributeName: "Strength_Core", attributeParam: -1, formulaReference: "ParagonNodeCoreStat_RareMinor", category: "coreAttribute", base: 10, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
     },
     "2449751": {
@@ -1116,4 +1131,55 @@ export const RELENTLESS_BONUS_REGISTRY = {
       ]
     }
   }
+};
+
+// These boards reuse exact pinned node records. Rare thresholds need separate
+// evidence for each board, even when the base bonuses are already verified.
+export const SENTENCING_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2439031,
+  observedBoardEquipIndex: 7,
+  unverifiedRareThresholds: true,
+  additionalBonusCategories: ["attackSpeed", "healingReceived"],
+  thresholds: {},
+  reuseNodeRecords: [
+    { sourceBoardSnoId: 2436481, nodeSnoIds: [678754, 679184] },
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2127186, 678750] },
+    { sourceBoardSnoId: 2438973, nodeSnoIds: [679060, 1195913] },
+    { sourceBoardSnoId: 2438913, nodeSnoIds: [2449942], baseOnly: true, reportUnresolvedConditional: true },
+    { sourceBoardSnoId: 2439024, nodeSnoIds: [2449913], baseOnly: true, reportUnresolvedConditional: true }
+  ],
+  nodes: {}
+};
+
+export const ENDURE_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2439033,
+  observedBoardEquipIndex: 8,
+  unverifiedRareThresholds: true,
+  additionalBonusCategories: ["healingReceived"],
+  thresholds: {},
+  reuseNodeRecords: [
+    { sourceBoardSnoId: 2436481, nodeSnoIds: [678754, 679184] },
+    { sourceBoardSnoId: 2438973, nodeSnoIds: [1195913] }
+  ],
+  nodes: {}
+};
+
+export const BEACON_BONUS_REGISTRY = {
+  sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
+  boardSnoId: 2439035,
+  observedBoardEquipIndex: 9,
+  unverifiedRareThresholds: true,
+  additionalBonusCategories: ["attackSpeed", "criticalStrikeDamage", "maximumFaith"],
+  thresholds: {},
+  reuseNodeRecords: [
+    { sourceBoardSnoId: 2436481, nodeSnoIds: [671247, 678754, 679184] },
+    { sourceBoardSnoId: 2436511, nodeSnoIds: [2063114, 678750] },
+    { sourceBoardSnoId: 2438913, nodeSnoIds: [671242, 2525975] },
+    { sourceBoardSnoId: 2438973, nodeSnoIds: [679060] },
+    { sourceBoardSnoId: 2438913, nodeSnoIds: [2449942, 2449944], baseOnly: true, reportUnresolvedConditional: true },
+    { sourceBoardSnoId: 2438992, nodeSnoIds: [2449940], baseOnly: true, reportUnresolvedConditional: true }
+  ],
+  nodes: {}
 };

@@ -6,15 +6,18 @@ This is a dependency-free browser viewer/calculator for Diablo IV Paladin Parago
 
 - **Board 00 — Starting Board** (SNO `2436481`)
 - **Board 01 — Castle** (SNO `2436511`), modeled as the first additional board (`ParagonBoardEquipIndex = 1`)
-- **Board 02 — Shield Bearer** (SNO `2436844`), with selected verified shared core-stat and Magic bonuses
+- **Board 02 — Shield Bearer** (SNO `2436844`), with complete ordinary numerical bonuses at equip index 2
 - **Board 03 — Fervent** (SNO `2438913`), with complete ordinary numerical bonuses at equip index 3
 - **Board 04 — Preacher** (SNO `2438973`), with complete ordinary numerical bonuses at equip index 4
 - **Board 05 — Divinity** (SNO `2438992`), with complete ordinary numerical bonuses at equip index 5
 - **Board 06 — Relentless** (SNO `2439024`), with complete ordinary numerical bonuses at equip index 6
+- **Board 07 — Sentencing** (SNO `2439031`), with selected Magic bonuses and two Rare bases
+- **Board 08 — Endure** (SNO `2439033`), with selected Magic bonuses
+- **Board 09 — Beacon** (SNO `2439035`), with selected Magic bonuses and three Rare bases
 
 `paragon-visual/app.js` loads board/node JSON, merges revision-pinned definitions from `shared-node-definitions.js` according to board SNO, renders the 21×21 grid, manages zoom/pan/tooltips and allocation connectivity, persists independent allocations, and passes allocated indices plus external attributes to the pure calculation module. `paragon-calculator.js` validates board/node identity and combines pinned core-stat formulas with board-scoped records from `paragon-bonus-registry.js`. Missing or mismatched numerical evidence is reported as unresolved rather than zero. The UI has a responsive, collapsible Paragon-only Total Stats sidebar beside the board; it derives totals and hover contributors from calculator node evaluations, excluding external attributes and inactive conditionals.
 
-Boards 01–06 have no authored starting node. The viewer lets the user choose one of their four gates as a **local allocation anchor**. This is a drafting convenience, not board attachment.
+Boards 01–09 have no authored starting node. The viewer lets the user choose one of their four gates as a **local allocation anchor**.
 
 ## Data source
 
@@ -31,13 +34,15 @@ Relevant upstream paths:
 - `json/base/meta/ParagonBoard/Paragon_Paladin_04.pbd.json`
 - `json/base/meta/ParagonBoard/Paragon_Paladin_05.pbd.json`
 - `json/base/meta/ParagonBoard/Paragon_Paladin_06.pbd.json`
+- `json/base/meta/ParagonBoard/Paragon_Paladin_07.pbd.json` through `Paragon_Paladin_09.pbd.json`
 - `json/base/meta/ParagonNode/*.pgn.json`
 - `json/base/meta/ParagonThreshold/*.pth.json`
 - `json/base/meta/GameBalance/AttributeFormulas.gam.json`
+- `json/enUS_Text/meta/StringList/ParagonBoard_Paragon_Paladin_*.stl.json` and `ParagonNode_*.stl.json` for localized board and node names
 
-Local board copies are `paladin-board-00.json` through `paladin-board-06.json`. Board-specific node metadata is in `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-06.json`. Reusable definitions live in `paragon-visual/shared-node-definitions.js` with explicit board-SNO applicability. Loading rejects duplicate names, duplicate SNOs, conflicts, unsupported boards, revision mismatches, and formula-source mismatches.
+Local board copies are `paladin-board-00.json` through `paladin-board-09.json`. Board-specific node metadata is in `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-09.json`. Reusable definitions live in `paragon-visual/shared-node-definitions.js` with explicit board-SNO applicability. Loading rejects duplicate names, duplicate SNOs, conflicts, unsupported boards, revision mismatches, and formula-source mismatches.
 
-Shared definitions include the four Normal core-stat nodes, the Gate, and Magic Intelligence and Willpower on all boards. Magic Maximum Life applies to 00–05, Magic Armor to 00/01, Magic Block Chance and Damage to Crowd Controlled to 01/02, Magic Physical Damage to 01–03, and Magic Damage to 00/02/05. Numerical resolution still requires the calculator's pinned formula checks or the correct board-scoped bonus registry.
+Shared definitions include the four Normal core-stat nodes, the Gate, and Magic Intelligence and Willpower on all boards. Magic Maximum Life applies to 00–05 and 07–09, Magic Armor to 00/01/09, Magic Block Chance to 01/02/09, Magic Damage to Crowd Controlled to 01/02, Magic Physical Damage to 01–03, and Magic Damage to 00/02/05/07–09. Numerical resolution requires the calculator's pinned formula checks or the applicable board-scoped bonus registry.
 
 Remaining board-specific definitions include Board 00's Magic Damage to Elites, Rares, socket, and start node; Board 01's Magic Armor Percent, All Resistance, and Strength plus its Rares, socket, and Legendary; and Board 02's Magic Thorns, Rares, socket, and Legendary. Rare and Legendary definitions were not moved.
 
@@ -45,7 +50,7 @@ Board 03 keeps board-specific definitions for Magic Armor Percent, All Resistanc
 
 ## Implemented and verified functionality
 
-All seven boards render at their source coordinates and share the established node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations.
+All ten boards render at their source coordinates and share the established node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations.
 
 External attributes remain editable and locally persisted above the board. Verified and total-threshold breakdowns, raw bonuses, unresolved diagnostics, and provenance are retained in a closed-by-default **Advanced Calculation Details** section. The detailed raw-bonus view includes flat Thorns with Base / Conditional / Total values and no percent suffix.
 
@@ -85,10 +90,11 @@ Threshold evaluation uses total character attributes: external inputs plus verif
 - The four generic Normal definitions, the Gate, and Magic Intelligence/Willpower are shared with Boards 00/01. Normal and Gate core attributes resolve to the pinned `ParagonNodeCoreStat_Normal = 5`; Magic Intelligence/Willpower resolve to `ParagonNodeCoreStat_Magic = 7`. Repeated allocations accumulate normally.
 - The Board 02 registry reuses the direct Board 00 observations for the identical `Generic_Magic_Damage` and `Generic_Magic_HPPercent` source nodes: Damage `+5%` and Maximum Life `+2%`. These are SNO-scoped records, not global formula rules.
 - Board 02 also has a narrow node-identity reuse link to Castle's formula-derived records for identical source nodes: `Generic_Magic_DamagePhysical` `+5%`, `Generic_Magic_BlockChance` `+2%`, and `Generic_Magic_DamageToCC` `+8.75%`. The link checks source revision, SNO, node name, and source path; it neither reclassifies provenance nor exposes Castle Rare records or thresholds.
-- Direct Board 02 observations resolve `Generic_Magic_Thorns` as `+100` flat Thorns and `Paladin_Rare_008` (Stalwart) as `+2.5%` Block Chance / `+15%` Blocked Damage Reduction, plus another `+2.5%` Block Chance at 305 Willpower. `Paladin_Rare_010` (Knight) remains an exact Castle **base-only** reuse: `+10%` Physical Damage / `+10 Strength`; its Castle conditional is intentionally not reused. Planner observations resolve `Paladin_Rare_012` (Bludgeoning) as `+10%` Damage, `+10%` Damage to Crowd Controlled, plus `+10%` Damage at 1,345 Strength; and `Paladin_Rare_015` (Bodyguard) as `+10%` Physical Damage, `+2.5%` Block Chance, plus `+10%` Physical Damage at 1,155 Strength **and** 260 Intelligence. Planner records remain scoped to Board 02's index-2 calculation context; the new Thorns/Stalwart records retain `direct-in-game` provenance.
+- Direct Board 02 observations resolve `Generic_Magic_Thorns` as `+100` flat Thorns and `Paladin_Rare_008` (Stalwart) as `+2.5%` Block Chance / `+15%` Blocked Damage Reduction, plus another `+2.5%` Block Chance at 305 Willpower. Planner observations resolve `Paladin_Rare_012` (Bludgeoning) as `+10%` Damage, `+10%` Damage to Crowd Controlled, plus `+10%` Damage at 1,345 Strength; and `Paladin_Rare_015` (Bodyguard) as `+10%` Physical Damage, `+2.5%` Block Chance, plus `+10%` Physical Damage at 1,155 Strength **and** 260 Intelligence. Planner records remain scoped to Board 02's index-2 calculation context; the new Thorns/Stalwart records retain `direct-in-game` provenance.
 - Corrected direct observations resolve both remaining Thorns Rares: `Paladin_Rare_011` / Growth (SNO `2449751`) grants `+150` flat Thorns and `+4%` Maximum Life, plus another `+150` Thorns at 1,215 Strength through `StrengthMain2`; `Paladin_Rare_013` / Constrict (SNO `2449755`) grants `+150` flat Thorns and `+10 Strength`, plus another `+150` Thorns at 305 Willpower through `WillPowerSide3`. The user-supplied `2449735` is not present in the pinned board; `2449755` is the verified source SNO used by the registry.
 - Layout, rarity styling, tooltips, independent allocation persistence, and the four source-coordinate gates are implemented.
-- Board 02's registry contains six direct-observation Magic/Rare records, three exact Castle Magic node links, one base-only exact Castle Rare link, and the two Board 02 planner-observed Rare records above. Full-grid checks resolve all its Magic bonuses. Knight's equip-index-2 conditional still needs separate evidence.
+- Direct in-game observations on Shield Bearer resolve Knight (`Paladin_Rare_010`, SNO `2449723`) at equip index 2. Its base bonuses are `+10% Physical Damage` and `+10 Strength`. It grants another `+10% Physical Damage` when total attributes meet **1,155 Strength AND 260 Willpower**. The pinned node marks attribute slot 0 and references the `Paladin_Strength+Willpower` selector (SNO `2504901`). This board-scoped observation supersedes the earlier base-only Castle link.
+- Board 02 has complete ordinary numerical coverage at equip index 2, including all six Rare conditionals. The Legendary power remains unresolved.
 
 ### Board 03 — Fervent
 
@@ -151,14 +157,53 @@ The Rare amounts and requirements below are direct in-game observations. Pinned 
 
 Inner Strength's pinned `Druid_Willpower+Dexterity` selector is ineligible for Paladin. The Paladin observation matches `WillPowerSide2`. Dervish marks zero-based slot 1 for its Cooldown Reduction conditional. Damage while Fortified and while Healthy are shown as separate raw bonus categories. Totals track the allocated per-node contributions.
 
+### Boards 07–09 — Sentencing, Endure, and Beacon
+
+Board and Rare names are from the pinned English string lists. Each 21×21 grid has 30 Magic cells, six Rare cells, four gates at indices `10`, `210`, `230`, and `430`, one socket, and one Legendary. Endure has two Restorative cells that share a single definition (SNO `680037`).
+
+| Board / SNO | Occupied / merged definitions | Normal cells | Legendary node SNO |
+|---|---:|---:|---:|
+| 07 Sentencing / `2439031` | 162 / 23 | 120 | `2438124` |
+| 08 Endure / `2439033` | 174 / 19 | 132 | `2438126` |
+| 09 Beacon / `2439035` | 171 / 24 | 129 | `2438128` |
+
+All three use the pinned formulas for Normal core stats (+5), Gates (+5 to each core stat), and Magic Intelligence and Willpower (+7). The registry links below require matching source revision and node identity. The original evidence provenance is preserved.
+
+| Boards | Reused Magic bonuses | Evidence |
+|---|---|---|
+| 07–09 | Damage +5% (`678754`), Maximum Life +2% (`679184`) | Board 00 direct in-game |
+| 07 | Armor +1.5% (`2127186`) | Castle formula-derived |
+| 07, 09 | All Resistance +1.5% (`678750`) | Castle formula-derived |
+| 07, 08 | Healing Received +3% (`1195913`) | Preacher direct in-game |
+| 07, 09 | Attack Speed +1.3% (`679060`) | Preacher direct in-game |
+| 09 | Armor +1.5% (`671247`) | Board 00 direct in-game |
+| 09 | Block Chance +2% (`2063114`) | Castle formula-derived |
+| 09 | Critical Strike Damage +7.5% (`671242`), Maximum Faith +2 flat (`2525975`) | Fervent formula-derived Critical Strike Damage and direct in-game Faith |
+
+| Board | Unresolved Magic node types | Reused Rare bases from direct in-game evidence | Rare nodes with both base bonuses unresolved |
+|---|---|---|---|
+| 07 | Lucky Hit Chance (`1340824`), Judgement Damage (`2500772`) | Sturdy (`2449942`), +3% Armor and +4% Maximum Life from Fervent. Rare Endure (`2449913`), +3% All Resistance and +10 Strength from Relentless. | Benediction (`2449924`), Grace (`2449915`), Luminous (`2449918`), Restorative (`680037`) |
+| 08 | Lucky Hit Chance (`1340824`), Life Regeneration after taking no damage (`679136`) | None | Anointed (`2449931`), Grace (`2449915`), Radiance (`2449928`), Restorative (`680037`, two cells), Wrathful (`2449936`) |
+| 09 | Armor Percent (`679347`, internal name `Generic_Magic_DamageReductionFromElite`) | Champion (`2449940`), +10% Damage and +10 Strength from Divinity. Constitution (`2449944`), +3% All Resistance and +4% Maximum Life, and Sturdy (`2449942`), +3% Armor and +4% Maximum Life, from Fervent. | Blurring (`2449946`), Fortitude (`2449951`), Spiked Shield (`2449949`) |
+
+All six Rare conditional amounts and requirements on each board are unresolved. The following selectors and marked attributes are datamined.
+
+| Board | Rare conditional slots and selectors |
+|---|---|
+| 07 | Benediction, Judgement Damage (`StrengthMain3`). Endure, All Resistance (`WillPowerSide3`). Grace, Lucky Hit Chance (`WillPowerSide1`). Luminous, damage type parameter 6 (`IntelligenceSide1`). Restorative, Maximum Life (`WillPowerSide2` and `IntelligenceSide2` are authored selectors). Sturdy, Armor (`IntelligenceSide1`). |
+| 08 | Anointed, Healing Received (`WillPowerSide1`). Grace, Lucky Hit Chance (`WillPowerSide1`). Radiance, damage type parameter 6 (`StrengthMain3`). Restorative, Maximum Life (`WillPowerSide2` and `IntelligenceSide2` are authored selectors). Wrathful, damage type parameter 6 (`WillPowerSide2`). |
+| 09 | Blurring, Critical Strike Damage (`StrengthMain1`). Champion, Damage (`WillPowerSide1`). Constitution, All Resistance (`StrengthMain1`). Fortitude, Maximum Faith (`IntelligenceSide1`). Spiked Shield, Block Chance (`WillPowerSide1`). Sturdy, Armor (`IntelligenceSide1`). |
+
+The Legendary power on each board remains unresolved.
+
 ## Important files
 
 - `paragon-visual/index.html`, `style.css`, `app.js` — UI, rendering, interaction, persistence.
 - `paragon-visual/paragon-calculator.js` — calculation and unresolved-bonus engine.
 - `paragon-visual/paragon-bonus-registry.js` — revision/board/SNO-scoped numerical evidence.
 - `paragon-visual/shared-node-definitions.js` — authoritative pinned reusable Normal, compatible Magic, and verified Gate definitions with per-board applicability and merge validation.
-- `paladin-board-00.json` through `paladin-board-06.json` — board grids.
-- `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-06.json` — board-specific definitions.
+- `paladin-board-00.json` through `paladin-board-09.json` — board grids.
+- `paragon-visual/node-data.json` and `node-data-01.json` through `node-data-09.json` — board-specific definitions.
 - `research/paragon-completeness-audit.md` — Board 00 audit.
 - `research/paragon-raw-bonuses.md` — Board 00 observations and calculator boundaries.
 - `research/tenacity-threshold-investigation.md` — class ordering and Tenacity experiment.
@@ -172,8 +217,9 @@ Inner Strength's pinned `Druid_Willpower+Dexterity` selector is ineligible for P
 - Board 02 uses `d4-paragon-paladin-02-v1`; its value contains `entryNodeIndex` and `allocatedNodeIndices`.
 - Board 03 uses `d4-paragon-paladin-03-v1`. Its value contains `entryNodeIndex` and `allocatedNodeIndices`.
 - Boards 04–06 use their own `d4-paragon-paladin-04-v1`, `d4-paragon-paladin-05-v1`, and `d4-paragon-paladin-06-v1` keys with the same gate and allocation fields.
+- Boards 07–09 use `d4-paragon-paladin-07-v1`, `d4-paragon-paladin-08-v1`, and `d4-paragon-paladin-09-v1` with the same gate and allocation fields.
 - External attributes use `d4-paragon-paladin-00-external-attributes-v1` and are shared by the calculator view.
-- Build-file import/export remains **Board 00 only**, schema version 1. Boards 01–06 disable these buttons.
+- Build-file import/export remains **Board 00 only**, schema version 1. Boards 01–09 disable these buttons.
 
 ## Known limitations
 
@@ -181,7 +227,6 @@ Inner Strength's pinned `Druid_Willpower+Dexterity` selector is ineligible for P
 - Castle Rare numbers/requirements are verified only for equip index 1; other placements remain unresolved.
 - Formula-derived Castle Magic outputs are not all direct Castle tooltip observations, and power-budget intrinsic values must not be generalized beyond documented evidence.
 - Boards are not connected; the Castle gate anchor does not assert a legal in-game attachment.
-- Shield Bearer resolves its shared Normal/Gate `+5` core attributes, shared Magic Intelligence/Willpower `+7`, node-scoped direct-observation Magic bonuses (Damage `+5%`, Maximum Life `+2%`, flat Thorns `+100`), exact Castle formula-derived Magic records (Physical Damage `+5%`, Block Chance `+2%`, Damage to Crowd Controlled `+8.75%`), and all six supported Rare records. Knight's equip-index-2 conditional remains unverified.
 - Totals cover registered Paragon bonuses, not a complete character sheet.
 - No live visual browser pass has been completed for the final Board 01 calculation state.
 
@@ -205,12 +250,22 @@ Boards 04–06 were checked cell by cell against the pinned grid and node files,
 
 After the initial direct observations were added, all 58 Rare threshold scenarios and 17 repeated Magic-node checks passed. The threshold checks covered below, at, and above each requirement, either side of each AND requirement failing, base preservation, allocated attributes, and single application. Mismatched slots, selector SNOs, attribute parameters, and equip contexts were rejected. Boards 00–03 again matched their pre-change outputs in 2,732 cases. At that stage the full-grid ordinary unresolved counts were 3, 0, and 0 for Boards 04, 05, and 06 respectively, plus one separate unresolved Legendary per board. Headless Chrome verified threshold transitions, percentage totals, tooltips, allocation, refunds, switching, and independent saves restored in a fresh page.
 
-After the direct Magic Healing Received observation was added, the full-grid calculator reported zero unresolved ordinary entries on Boards 00–06. This diagnostic omits Board 02 Knight's unverified conditional because its registry is base-only. All eight Magic Healing allocation combinations, Recovery threshold boundaries, and 3,996 regression comparisons for unaffected outputs passed. Headless Chrome verified the +9% contribution, tooltip provenance, persistence across board switches, and recalculation after a refund.
+After the direct Magic Healing Received observation was added, the full-grid calculator reported zero unresolved ordinary entries on Boards 00–06. At that stage, the diagnostic omitted Board 02 Knight's conditional because its registry link exposed only the Castle base. All eight Magic Healing allocation combinations, Recovery threshold boundaries, and 3,996 regression comparisons for unaffected outputs passed. Headless Chrome verified the +9% contribution, tooltip provenance, persistence across board switches, and recalculation after a refund.
+
+Before adding Boards 07–09, the Preacher Healing Received fix was committed locally as `16fe983`. The three new board JSON files match their pinned source files byte for byte. The merged node metadata was checked against the pinned node and English localization files, including SNOs, attribute slots and parameters, formula references, thresholds, sockets, and passive power references. The merge rejected duplicate names, shared-definition conflicts, and a mismatched revision.
+
+All 4,597 calculator comparisons for Boards 00–06 matched the Preacher-fixed baseline, including threshold boundaries, unsupported equip contexts, and all eight Preacher Healing Received allocation combinations. Tests of all 507 new occupied cells checked resolved values and provenance, unresolved effects, and rejection of mismatched registry context and source identity. The full-grid diagnostic reported 17, 19, and 13 unresolved entries for Boards 07, 08, and 09 respectively, including one Legendary per board. A diagnostic entry can cover an unresolved base and its marked conditional slot.
+
+Headless Chrome over HTTP exercised all ten board options, chosen gate anchors, blocked disconnected allocations and refunds, successful connected allocations and leaf refunds, and independent restoration across board switches and a page reload. Tooltip checks included Preacher and Sentencing Healing Received, Sentencing's reused Sturdy base and unresolved threshold, Endure's unresolved Restorative bonuses and selectors, Beacon's flat Maximum Faith, and unresolved Magic and Legendary effects.
+
+After Knight's Shield Bearer conditional was added, 6,525 calculator comparisons across Boards 00–09 confirmed the expected Knight-only changes. Nine Knight boundary combinations covered Strength 1,154–1,156 and Willpower 259–261. Focused checks also confirmed that allocated stats count toward the thresholds, repeated indices grant the bonus once, and other equip contexts reject the observation. The full-grid diagnostic reports zero unresolved ordinary bonuses and one unresolved Legendary on Board 02. Headless Chrome verified Knight's displayed threshold progress, one-time bonus application, and recalculation on refund. All ten boards passed the allocation and persistence smoke checks again.
 
 ## Current boundary
 
-Board 02 structural rendering, supported shared Normal/Gate/Magic calculations (including direct flat Thorns), one base-only exact Castle Rare record, four direct Thorns/Stalwart Rare records, and two Board 02 planner-observed Rare records are complete. Knight's conditional at equip index 2 remains unverified.
+Shield Bearer has complete ordinary numerical coverage at equip index 2, including Knight's directly observed two-attribute conditional.
 
 Fervent supports structural rendering, independent gate-anchored allocation, and every ordinary numerical bonus in equip context 3.
 
 Boards 04–06 have complete ordinary numerical coverage in their observed equip contexts, including all 18 Rare conditionals.
+
+Boards 07–09 have complete structural coverage. The evidence gaps for Magic bonuses, Rare bases, Rare conditionals, and Legendary powers are listed above.
