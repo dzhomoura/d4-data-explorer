@@ -836,6 +836,14 @@ export const PREACHER_BONUS_REGISTRY = {
       attributes: [
         { attributeIndex: 0, attributeId: 747, attributeName: "Fortified_Health_Application_Bonus", attributeParam: -1, formulaReference: "ParagonNodeFortifyBonus_Magic", category: "fortifyGeneration", base: 1.6, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
       ]
+    },
+    "1195913": {
+      name: "Generic_Magic_HealingBonus",
+      sourcePath: "json/base/meta/ParagonNode/Generic_Magic_HealingBonus.pgn.json",
+      ptBonusAttributeIndices: [],
+      attributes: [
+        { attributeIndex: 0, attributeId: 65, attributeName: "Bonus_Healing_Received_Percent", attributeParam: -1, formulaReference: "ParagonNodeHealingBonus_Magic", category: "healingReceived", base: 3, conditional: 0, thresholdReference: null, provenance: DIRECT_IN_GAME, glyphAmplificationApplied: NO_GLYPH_AMPLIFICATION }
+      ]
     }
   }
 };

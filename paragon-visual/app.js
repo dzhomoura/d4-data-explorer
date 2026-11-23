@@ -61,7 +61,7 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
       requiresEntryGate: true,
       supportsBuildFiles: false,
       observedRareThresholds: true,
-      calculationScope: "Preacher includes the observed Rare bonuses and equip-index-4 thresholds. Magic Healing Received and the Legendary power remain unresolved."
+      calculationScope: "Preacher resolves ordinary node bonuses and all six observed Rare thresholds at equip index 4. The Legendary power remains unresolved."
     }),
     board05: Object.freeze({
       label: "Board 05 — Divinity",
