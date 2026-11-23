@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Paragon Board Viewer</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Sanctuary · Character Progression</p>
+          <h1>Paragon Board</h1>
+          <p id="board-status" class="board-status" role="status">Loading board…</p>
+          <label class="board-selector-label" for="board-selector">
+            Board
+            <select id="board-selector">
+              <option value="board00">Board 00 — Starting Board</option>
+              <option value="board01" disabled>Board 01 — Castle</option>
+              <option value="board02" disabled>Board 02 — Shield Bearer</option>
+            </select>
+          </label>
+        </div>
+        <div class="zoom-controls" aria-label="Board zoom controls">
+          <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+          <button id="zoom-reset" type="button">Reset view</button>
+          <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        </div>
+      </header>
+
+      <section class="board-panel" aria-label="Paragon board viewer">
+        <section class="allocation-panel" aria-labelledby="allocation-title">
+          <div class="allocation-main">
+            <div class="allocation-copy">
+              <p class="eyebrow">Experimental prototype</p>
+              <h2 id="allocation-title">Point allocation</h2>
+              <p class="allocation-instructions">Left-click a highlighted node to allocate it. Right-click an allocated node to refund it; remaining paths must stay connected to the starting node.</p>
+              <p id="allocation-message" class="allocation-message" role="status" aria-live="polite">Starting node is active.</p>
+            </div>
+            <dl class="allocation-stats">
+              <div>
+                <dt>Points spent</dt>
+                <dd id="points-spent">0</dd>
+              </div>
+              <div>
+                <dt>Allocated nodes</dt>
+                <dd id="allocated-count">0</dd>
+              </div>
+            </dl>
+            <div class="allocation-actions">
+              <p id="save-status" class="save-status save-status--unsaved" role="status" aria-live="polite">Not saved yet</p>
+              <div class="allocation-action-buttons">
+                <button id="export-build" class="allocation-reset" type="button">Export Build</button>
+                <button id="import-build" class="allocation-reset" type="button">Import Build</button>
+                <button id="allocation-reset" class="allocation-reset" type="button">Reset Allocation</button>
+              </div>
+              <input id="build-file" type="file" accept=".json,application/json" hidden>
+            </div>
+          </div>
+          <p class="allocation-cost-note">Provisional costs: starting node 0; every other node, including gates and sockets, 1 point.</p>
+        </section>
+
+        <section class="external-attribute-panel" aria-labelledby="external-attribute-title">
+          <div class="external-attribute-section">
+            <h2 id="external-attribute-title">External attributes</h2>
+            <p>Enter attributes from sources outside this board. These inputs are saved locally and are not included in Paragon bonus totals or build exports.</p>
+            <div class="external-attribute-inputs">
+              <label>Strength <input id="external-strength" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+              <label>Intelligence <input id="external-intelligence" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+              <label>Willpower <input id="external-willpower" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+              <label>Dexterity <input id="external-dexterity" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
+            </div>
+            <p id="external-save-status" class="external-save-status" role="status" aria-live="polite">Using default external attributes.</p>
+          </div>
+        </section>
+
+        <div class="board-workspace">
+          <div class="board-column">
+            <div id="board-stage" class="board-stage" tabindex="0" aria-label="Board canvas; drag to pan and use the mouse wheel to zoom">
+              <div id="board-frame" class="board-frame"></div>
+              <div id="node-tooltip" class="node-tooltip" role="tooltip" aria-hidden="true" hidden></div>
+            </div>
+            <footer class="board-footer">
+              <div id="legend" class="legend" aria-label="Node color legend">
+                <span class="legend-item"><i class="swatch swatch--normal"></i>Normal</span>
+                <span class="legend-item"><i class="swatch swatch--magic"></i>Magic</span>
+                <span class="legend-item"><i class="swatch swatch--rare"></i>Rare</span>
+                <span class="legend-item"><i class="swatch swatch--legendary"></i>Legendary</span>
+                <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
+                <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
+                <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>
+              </div>
+              <p class="connection-note">Only orthogonally adjacent occupied nodes connect. Allocated paths are highlighted in red.</p>
+            </footer>
+          </div>
+
+          <aside class="stats-sidebar" aria-label="Allocated Paragon bonus summary">
+            <details id="stats-sidebar-details" open>
+              <summary><span>Total stats</span><span class="stats-sidebar-summary">Paragon only</span></summary>
+              <p class="stats-sidebar-note">Hover a bonus to highlight its allocated contributing nodes.</p>
+              <ul id="stats-sidebar-list" class="stats-sidebar-list" aria-live="polite"></ul>
+              <p id="stats-sidebar-empty" class="stats-sidebar-empty">Allocate verified bonus nodes to see totals.</p>
+            </details>
+          </aside>
+        </div>
+
+        <details class="advanced-details">
+          <summary>Advanced Calculation Details <span>Verified breakdowns and diagnostics</span></summary>
+          <div class="advanced-details__content">
+        <section class="attribute-panel" aria-labelledby="attribute-panel-title">
+          <div class="attribute-panel-heading">
+            <div>
+              <h2 id="attribute-panel-title">Verified Paragon bonuses</h2>
+              <p>Bonuses from allocated Paragon nodes only; these are not your complete character attributes.</p>
+              <p id="calculation-scope-note" class="calculation-scope-note">Loading calculation scope…</p>
+            </div>
+            <p class="unresolved-summary">Unresolved bonuses <strong id="unresolved-bonus-count">0</strong></p>
+          </div>
+          <dl class="attribute-totals">
+            <div><dt>Strength gained</dt><dd id="paragon-strength">+0</dd></div>
+            <div><dt>Intelligence gained</dt><dd id="paragon-intelligence">+0</dd></div>
+            <div><dt>Willpower gained</dt><dd id="paragon-willpower">+0</dd></div>
+            <div><dt>Dexterity gained</dt><dd id="paragon-dexterity">+0</dd></div>
+            <div class="attribute-total"><dt>Total verified core attributes</dt><dd id="paragon-core-total">+0</dd></div>
+          </dl>
+          <div class="threshold-attribute-section">
+            <h3>Total attributes used for thresholds</h3>
+            <p>External attributes plus verified gains from allocated Paragon nodes.</p>
+            <dl class="total-attribute-totals">
+              <div><dt>Total Strength</dt><dd id="total-strength">0</dd></div>
+              <div><dt>Total Intelligence</dt><dd id="total-intelligence">0</dd></div>
+              <div><dt>Total Willpower</dt><dd id="total-willpower">0</dd></div>
+              <div><dt>Total Dexterity</dt><dd id="total-dexterity">0</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <section class="raw-bonus-panel" aria-labelledby="raw-bonus-title">
+          <div class="raw-bonus-heading">
+            <div>
+              <h2 id="raw-bonus-title">Verified raw bonuses</h2>
+              <p>Unamplified bonuses from allocated nodes. Damage categories are kept separate; no glyph effects are applied.</p>
+            </div>
+          </div>
+          <div class="raw-bonus-totals">
+            <article>
+              <h3>Damage</h3>
+              <dl><div><dt>Base</dt><dd id="raw-damage-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-damage-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-damage-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Damage to Elites</h3>
+              <dl><div><dt>Base</dt><dd id="raw-elites-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-elites-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-elites-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Physical Damage</h3>
+              <dl><div><dt>Base</dt><dd id="raw-physical-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-physical-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-physical-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Damage to Crowd Controlled</h3>
+              <dl><div><dt>Base</dt><dd id="raw-cc-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-cc-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-cc-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Maximum Life</h3>
+              <dl><div><dt>Base</dt><dd id="raw-life-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-life-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-life-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Total Armor</h3>
+              <dl><div><dt>Base</dt><dd id="raw-armor-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-armor-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-armor-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Resistance to All Elements</h3>
+              <dl><div><dt>Base</dt><dd id="raw-resistance-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-resistance-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-resistance-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Block Chance</h3>
+              <dl><div><dt>Base</dt><dd id="raw-block-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-block-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-block-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Blocked Damage Reduction</h3>
+              <dl><div><dt>Base</dt><dd id="raw-block-damage-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-block-damage-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-block-damage-total">+0%</dd></div></dl>
+            </article>
+            <article>
+              <h3>Thorns</h3>
+              <dl><div><dt>Base</dt><dd id="raw-thorns-base">+0</dd></div><div><dt>Conditional</dt><dd id="raw-thorns-conditional">+0</dd></div><div><dt>Total</dt><dd id="raw-thorns-total">+0</dd></div></dl>
+            </article>
+          </div>
+        </section>
+          </div>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>

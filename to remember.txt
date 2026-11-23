@@ -1,0 +1,14 @@
+d4-data-explorer/
+│
+├── explorer.js
+│
+├── data/
+│   ├── paladin-skills.json
+│   ├── paladin-modifiers.json
+│   └── paladin-aspects.json
+│
+├── research/
+│   ├── findings.md
+│   └── experiments.md
+│
+└── README.md

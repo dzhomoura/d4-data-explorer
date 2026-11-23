@@ -1,0 +1,205 @@
+{
+  "source": {
+    "repository": "DiabloTools/d4data",
+    "commit": "75e619f0d90a0951945747f45feef59c076a5db0",
+    "boardSnoId": 2436481,
+    "formulaSourcePath": "json/base/meta/GameBalance/AttributeFormulas.gam.json"
+  },
+  "nodes": [
+    {
+      "name": "Generic_Magic_DamageToElite",
+      "snoId": 678842,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Magic_DamageToElite.pgn.json",
+      "kind": "magic",
+      "rarityOverride": 2,
+      "attributes": [
+        {
+          "name": "Damage_Percent_Bonus_Vs_Elites",
+          "id": 953,
+          "param": -1,
+          "literalFormula": "0.05",
+          "formulaReference": "ParagonNodeDamageBonusToElite_Magic",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "thresholdReferences": [],
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Rare_118",
+      "snoId": 2549802,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Rare_118.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Damage_Percent_All_From_Skills",
+          "id": 252,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeDamageBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Strength_Core",
+          "id": 9,
+          "param": -1,
+          "literalFormula": "15",
+          "formulaReference": "ParagonNodeCoreStat_RareMinor",
+          "formulaValue": 10,
+          "verifiedBonus": null
+        }
+      ],
+      "thresholdReferences": [
+        {
+          "name": "IntelligenceSide2",
+          "target": "base/meta/ParagonThreshold/IntelligenceSide2.pth"
+        }
+      ],
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Barbarian_Rare_039",
+      "snoId": 2126168,
+      "sourcePath": "json/base/meta/ParagonNode/Barbarian_Rare_039.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Damage_Percent_Bonus_Vs_Elites",
+          "id": 953,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeDamageBonusToElite_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Strength_Core",
+          "id": 9,
+          "param": -1,
+          "literalFormula": "0",
+          "formulaReference": "ParagonNodeCoreStat_RareMinor",
+          "formulaValue": 10,
+          "verifiedBonus": null
+        }
+      ],
+      "thresholdReferences": [
+        {
+          "name": "WillPowerSide1",
+          "target": "base/meta/ParagonThreshold/WillPowerSide1.pth"
+        }
+      ],
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Generic_Socket",
+      "snoId": 681756,
+      "sourcePath": "json/base/meta/ParagonNode/Generic_Socket.pgn.json",
+      "kind": "socket",
+      "rarityOverride": 0,
+      "attributes": [],
+      "thresholdReferences": [],
+      "hasSocket": true,
+      "isGate": false
+    },
+    {
+      "name": "Barbarian_Rare_015",
+      "snoId": 675186,
+      "sourcePath": "json/base/meta/ParagonNode/Barbarian_Rare_015.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Hitpoints_Max_Percent_Bonus",
+          "id": 142,
+          "param": -1,
+          "literalFormula": "0.06",
+          "formulaReference": "ParagonNodeHPMaxBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Armor_Percent",
+          "id": 482,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeArmorBonus_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "thresholdReferences": [
+        {
+          "name": "StrengthSide1",
+          "target": "base/meta/ParagonThreshold/StrengthSide1.pth"
+        },
+        {
+          "name": "StrengthMain1",
+          "target": "base/meta/ParagonThreshold/StrengthMain1.pth"
+        },
+        {
+          "name": "WillpowerMain1",
+          "target": "base/meta/ParagonThreshold/WillpowerMain1.pth"
+        },
+        {
+          "name": "WillPowerSide1",
+          "target": "base/meta/ParagonThreshold/WillPowerSide1.pth"
+        }
+      ],
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "Barbarian_Rare_022",
+      "snoId": 675448,
+      "sourcePath": "json/base/meta/ParagonNode/Barbarian_Rare_022.pgn.json",
+      "kind": "rare",
+      "rarityOverride": 3,
+      "attributes": [
+        {
+          "name": "Damage_Percent_All_From_Skills",
+          "id": 252,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeDamageBonus_RareMajor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        },
+        {
+          "name": "Hitpoints_Max_Percent_Bonus",
+          "id": 142,
+          "param": -1,
+          "literalFormula": "",
+          "formulaReference": "ParagonNodeHPMaxBonus_RareMinor",
+          "formulaValue": null,
+          "verifiedBonus": null
+        }
+      ],
+      "thresholdReferences": [
+        {
+          "name": "StrengthMain1",
+          "target": "base/meta/ParagonThreshold/StrengthMain1.pth"
+        }
+      ],
+      "hasSocket": false,
+      "isGate": false
+    },
+    {
+      "name": "StartNodePaladin",
+      "snoId": 2436489,
+      "sourcePath": "json/base/meta/ParagonNode/StartNodePaladin.pgn.json",
+      "kind": "start",
+      "rarityOverride": 0,
+      "attributes": [],
+      "thresholdReferences": [],
+      "hasSocket": false,
+      "isGate": false
+    }
+  ]
+}

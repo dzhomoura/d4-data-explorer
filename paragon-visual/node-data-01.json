@@ -1,0 +1,379 @@
+{
+    "source":  {
+                   "repository":  "DiabloTools/d4data",
+                   "commit":  "75e619f0d90a0951945747f45feef59c076a5db0",
+                   "boardSnoId":  2436511,
+                   "boardDisplayName":  "Castle",
+                   "formulaSourcePath":  "json/base/meta/GameBalance/AttributeFormulas.gam.json"
+               },
+    "nodes":  [
+                  {
+                      "name":  "Generic_Magic_ArmorPercent",
+                      "displayName":  null,
+                      "snoId":  2127186,
+                      "sourcePath":  "json/base/meta/ParagonNode/Generic_Magic_ArmorPercent.pgn.json",
+                      "kind":  "magic",
+                      "rarityOverride":  2,
+                      "attributes":  [
+                                         {
+                                             "name":  "Armor_Percent",
+                                             "id":  482,
+                                             "param":  -1,
+                                             "literalFormula":  "",
+                                             "formulaReference":  "ParagonNodeArmorBonus_Magic",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+
+                                                  ],
+                      "thresholdReferences":  [
+
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Generic_Magic_ResistanceAll",
+                      "displayName":  null,
+                      "snoId":  678750,
+                      "sourcePath":  "json/base/meta/ParagonNode/Generic_Magic_ResistanceAll.pgn.json",
+                      "kind":  "magic",
+                      "rarityOverride":  2,
+                      "attributes":  [
+                                         {
+                                             "name":  "Resistance_All_Bonus_Percent",
+                                             "id":  79,
+                                             "param":  -1,
+                                             "literalFormula":  "",
+                                             "formulaReference":  "ParagonNodeResistAll_Magic",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+
+                                                  ],
+                      "thresholdReferences":  [
+
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Generic_Magic_Str",
+                      "displayName":  null,
+                      "snoId":  678624,
+                      "sourcePath":  "json/base/meta/ParagonNode/Generic_Magic_Str.pgn.json",
+                      "kind":  "magic",
+                      "rarityOverride":  2,
+                      "attributes":  [
+                                         {
+                                             "name":  "Strength_Core",
+                                             "id":  9,
+                                             "param":  -1,
+                                             "literalFormula":  "",
+                                             "formulaReference":  "ParagonNodeCoreStat_Magic",
+                                             "formulaValue":  7,
+                                             "verifiedBonus":  7
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+
+                                                  ],
+                      "thresholdReferences":  [
+
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Generic_Socket",
+                      "displayName":  null,
+                      "snoId":  681756,
+                      "sourcePath":  "json/base/meta/ParagonNode/Generic_Socket.pgn.json",
+                      "kind":  "socket",
+                      "rarityOverride":  0,
+                      "attributes":  [
+
+                                     ],
+                      "ptBonusAttributeIndices":  [
+
+                                                  ],
+                      "thresholdReferences":  [
+
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  true,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Legendary_001",
+                      "displayName":  "Castle",
+                      "snoId":  2437020,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Legendary_001.pgn.json",
+                      "kind":  "legendary",
+                      "rarityOverride":  4,
+                      "attributes":  [
+
+                                     ],
+                      "ptBonusAttributeIndices":  [
+
+                                                  ],
+                      "thresholdReferences":  [
+
+                                              ],
+                      "passivePower":  {
+                                           "name":  "Paragon_Paladin_Legendary_001",
+                                           "snoId":  2488259,
+                                           "target":  "base/meta/Power/Paragon_Paladin_Legendary_001.pow"
+                                       },
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Rare_005",
+                      "displayName":  "Defiance",
+                      "snoId":  2449713,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Rare_005.pgn.json",
+                      "kind":  "rare",
+                      "rarityOverride":  3,
+                      "attributes":  [
+                                         {
+                                             "name":  "Armor_Percent",
+                                             "id":  482,
+                                             "param":  -1,
+                                             "literalFormula":  "",
+                                             "formulaReference":  "ParagonNodeArmorBonus_RareMajor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         },
+                                         {
+                                             "name":  "Resistance_All_Bonus_Percent",
+                                             "id":  79,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeResistAll_RareMinor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+                                                      0
+                                                  ],
+                      "thresholdReferences":  [
+                                                  {
+                                                      "name":  "StrengthMain3",
+                                                      "target":  "base/meta/ParagonThreshold/StrengthMain3.pth"
+                                                  }
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Rare_006",
+                      "displayName":  "Grappler",
+                      "snoId":  2449715,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Rare_006.pgn.json",
+                      "kind":  "rare",
+                      "rarityOverride":  3,
+                      "attributes":  [
+                                         {
+                                             "name":  "Damage_Type_Percent_Bonus",
+                                             "id":  254,
+                                             "param":  0,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeDamageBonus_RareMajor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         },
+                                         {
+                                             "name":  "Damage_Percent_Bonus_Vs_CC_All",
+                                             "id":  959,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeCritDamageToCC_RareMinor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+                                                      0
+                                                  ],
+                      "thresholdReferences":  [
+                                                  {
+                                                      "name":  "IntelligenceSide1",
+                                                      "target":  "base/meta/ParagonThreshold/IntelligenceSide1.pth"
+                                                  }
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Rare_007",
+                      "displayName":  "Ironclad",
+                      "snoId":  2449717,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Rare_007.pgn.json",
+                      "kind":  "rare",
+                      "rarityOverride":  3,
+                      "attributes":  [
+                                         {
+                                             "name":  "Strength_Core",
+                                             "id":  9,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeCoreStat_RareMajor",
+                                             "formulaValue":  10,
+                                             "verifiedBonus":  null
+                                         },
+                                         {
+                                             "name":  "Armor_Percent",
+                                             "id":  482,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeArmorBonus_RareMinor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+                                                      1
+                                                  ],
+                      "thresholdReferences":  [
+                                                  {
+                                                      "name":  "IntelligenceSide1",
+                                                      "target":  "base/meta/ParagonThreshold/IntelligenceSide1.pth"
+                                                  }
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Rare_008",
+                      "displayName":  "Stalwart",
+                      "snoId":  2449719,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Rare_008.pgn.json",
+                      "kind":  "rare",
+                      "rarityOverride":  3,
+                      "attributes":  [
+                                         {
+                                             "name":  "Block_Chance",
+                                             "id":  331,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeBlockChance_RareMinor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         },
+                                         {
+                                             "name":  "Block_Damage_Percent_Bonus",
+                                             "id":  335,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeDamageBonusDot_RareMajor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+                                                      0
+                                                  ],
+                      "thresholdReferences":  [
+                                                  {
+                                                      "name":  "WillPowerSide3",
+                                                      "target":  "base/meta/ParagonThreshold/WillPowerSide3.pth"
+                                                  }
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Rare_009",
+                      "displayName":  "Insulate",
+                      "snoId":  2449721,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Rare_009.pgn.json",
+                      "kind":  "rare",
+                      "rarityOverride":  3,
+                      "attributes":  [
+                                         {
+                                             "name":  "Damage_Percent_Bonus_Vs_CC_All",
+                                             "id":  959,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeCritDamageToCC_RareMajor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         },
+                                         {
+                                             "name":  "Resistance_All_Bonus_Percent",
+                                             "id":  79,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeResistAll_RareMinor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+                                                      0
+                                                  ],
+                      "thresholdReferences":  [
+                                                  {
+                                                      "name":  "Paladin_Strength+Willpower",
+                                                      "target":  "base/meta/ParagonThreshold/Paladin_Strength+Willpower.pth"
+                                                  }
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  },
+                  {
+                      "name":  "Paladin_Rare_010",
+                      "displayName":  "Knight",
+                      "snoId":  2449723,
+                      "sourcePath":  "json/base/meta/ParagonNode/Paladin_Rare_010.pgn.json",
+                      "kind":  "rare",
+                      "rarityOverride":  3,
+                      "attributes":  [
+                                         {
+                                             "name":  "Damage_Type_Percent_Bonus",
+                                             "id":  254,
+                                             "param":  0,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeDamageBonus_RareMajor",
+                                             "formulaValue":  null,
+                                             "verifiedBonus":  null
+                                         },
+                                         {
+                                             "name":  "Strength_Core",
+                                             "id":  9,
+                                             "param":  -1,
+                                             "literalFormula":  "0",
+                                             "formulaReference":  "ParagonNodeCoreStat_RareMinor",
+                                             "formulaValue":  10,
+                                             "verifiedBonus":  null
+                                         }
+                                     ],
+                      "ptBonusAttributeIndices":  [
+                                                      0
+                                                  ],
+                      "thresholdReferences":  [
+                                                  {
+                                                      "name":  "Paladin_Strength+Willpower",
+                                                      "target":  "base/meta/ParagonThreshold/Paladin_Strength+Willpower.pth"
+                                                  }
+                                              ],
+                      "passivePower":  null,
+                      "hasSocket":  false,
+                      "isGate":  false
+                  }
+              ]
+}
