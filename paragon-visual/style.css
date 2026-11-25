@@ -602,6 +602,7 @@ p.glyph-primary-result {
 
 #glyph-calculation-list p {
   margin: 4px 0 8px;
+  overflow-wrap: anywhere;
 }
 
 #glyph-calculation-list details ul {

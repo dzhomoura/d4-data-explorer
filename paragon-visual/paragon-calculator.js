@@ -12,7 +12,8 @@ import {
 } from "./paragon-bonus-registry.js";
 import { resolvePlacedRareThreshold } from "./paragon-thresholds.js";
 import { evaluatePrimaryGlyph } from "./glyph-primary.js";
-import { evaluateAmplificationAdditional, evaluateAmplificationGlyph } from "./glyph-amplification.js";
+import { evaluateAmplificationGlyph } from "./glyph-amplification.js";
+import { evaluateGlyphEffects } from "./glyph-effects.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -627,8 +628,10 @@ function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calcul
       totals.total += totals.glyph;
     }
     const glyph = amplification ?? conversion;
-    if (amplification?.status === "active") {
-      amplification.additional = evaluateAmplificationAdditional(amplification, board, nodeEvaluations);
+    const effects = evaluateGlyphEffects(glyphInput, glyph);
+    if (amplification?.status === "active" && effects) {
+      const { affixSnoId, requirements, resolved, satisfied } = effects.additionalEffect;
+      amplification.additional = { affixSnoId, requirements, resolved, satisfied };
     }
     const unresolvedBonuses = [...unresolvedByBonus.values()];
     const conditionalBonuses = nodeEvaluations.flatMap(node => (node.allocated ? node.attributes : [])
@@ -649,6 +652,10 @@ function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calcul
       nodeEvaluations,
       effectiveNodeContributions,
       ...((glyph?.status === "active" || glyph?.status === "unresolved") && { glyphEvaluations: [glyph] }),
+      ...(glyph?.status === "unpurchased" && { glyphPrimaryPreviews: [glyph] }),
+      ...(effects && { additionalGlyphEffects: [effects.additionalEffect] }),
+      ...(effects?.legendaryPreview && { legendaryGlyphPreviews: [effects.legendaryPreview] }),
+      ...(effects?.legendaryModifiers.length && { legendaryGlyphModifiers: effects.legendaryModifiers }),
       verifiedParagonBonuses: {
         coreAttributes,
         totalCoreAttributes: Object.values(coreAttributes).reduce((sum, amount) => sum + amount, 0),

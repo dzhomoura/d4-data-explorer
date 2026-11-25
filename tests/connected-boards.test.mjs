@@ -502,9 +502,14 @@ test("connected Primary pools react to radius and allocations while keeping Rare
   assert.deepEqual(run(51, 1029487, allocated, { ...external, Intelligence: 1500 }).glyphEvaluations, run(51).glyphEvaluations);
   assert.equal(run(51, 1029487, new Set([...allocated].filter(id => id !== "board00:141"))).glyphEvaluations[0].localAttribute, 15);
   const socketRefunded = new Set(glyphPath.slice(0, -1).map(index => `board00:${index}`));
-  assert.deepEqual(run(51, 1029487, socketRefunded), calculateConnectedBonuses(layout, socketRefunded, external));
   const reset = planConnectedBoardReset(layout, allocated, "board00").candidate;
-  assert.deepEqual(run(150, 1029487, reset), calculateConnectedBonuses(layout, reset, external));
+  for (const [level, nodes] of [[51, socketRefunded], [150, reset]]) {
+    const { additionalGlyphEffects, legendaryGlyphPreviews, glyphPrimaryPreviews, ...numerical } = run(level, 1029487, nodes);
+    assert.deepEqual(numerical, calculateConnectedBonuses(layout, nodes, external));
+    assert.equal(additionalGlyphEffects[0].status, "unpurchased");
+    assert.equal(legendaryGlyphPreviews[0].status, "unpurchased");
+    assert.equal(glyphPrimaryPreviews[0].status, "unpurchased");
+  }
 });
 
 test("multiple active glyphs survive save and rotation, and shared destinations sum each socket exactly once", () => {
@@ -603,4 +608,45 @@ test("operation-1 pools expand and contract through both boundaries and update o
   const refunded = reachableAllocations(layout.graph, new Set([...allocated].filter(id => id !== "board00:139")), layout.root);
   assert.ok(run(31).affectedNodeIndices.includes(139));
   assert.ok(!run(31, refunded).affectedNodeIndices.includes(139));
+});
+
+
+test("connected effects retain one owner per socket and destination across lifecycle changes", () => {
+  const { layout } = attachPlan([["board00:10", "board01", "castle"]]);
+  const allocated = reachableAllocations(layout.graph, new Set(layout.nodes.keys()), layout.root);
+  const glyphs = new Map([["board00", { snoId: 2478561, level: 51 }], ["castle", { snoId: 2478561, level: 150 }]]);
+  const run = (draft = layout, nodes = allocated, configurations = glyphs, external = zero) =>
+    calculateConnectedBonuses(draft, nodes, external, configurations);
+  const result = run();
+  assert.deepEqual(result.additionalGlyphEffects.map(record => [record.instanceId, record.socketSourceIndex]),
+    [["board00", 136], ["castle", 120]]);
+  assert.deepEqual(result.legendaryGlyphModifiers.map(record => [record.instanceId, record.destination.parameter]),
+    [["board00", 6], ["board00", 1], ["castle", 6], ["castle", 1]]);
+  assert.ok(!result.legendaryGlyphPreviews);
+  const external = { Strength: 1800, Intelligence: 1000, Willpower: 1000, Dexterity: 1000 };
+  const native = run(layout, allocated, new Map(), external);
+  const withExternal = run(layout, allocated, glyphs, external);
+  assert.deepEqual(withExternal.additionalGlyphEffects, result.additionalGlyphEffects);
+  assert.deepEqual(withExternal.legendaryGlyphModifiers, result.legendaryGlyphModifiers);
+  assert.deepEqual(withExternal.nodeEvaluations, native.nodeEvaluations);
+  assert.deepEqual(withExternal.totalAttributes, native.totalAttributes);
+  assert.deepEqual(withExternal.effectiveNodeContributions, native.effectiveNodeContributions);
+  const rotated = rotateConnectedBoard(resources, layout, allocated, "castle", 90);
+  assert.deepEqual(run(rotated), result);
+  const restored = readConnectedSaveV2(resources, writeConnectedSaveV2(rotated, allocated, glyphs));
+  assert.deepEqual(run(restored.layout, restored.allocated, restored.glyphs), result);
+  const replacement = configureConnectedGlyph(layout, glyphs, "castle", { snoId: 2073373, level: 51 });
+  const replaced = run(layout, allocated, replacement);
+  assert.equal(replaced.additionalGlyphEffects[1].effects[0].magnitude, 0.18);
+  assert.equal(replaced.legendaryGlyphModifiers[2].destination.id, 954);
+  assert.equal(replaced.legendaryGlyphModifiers[2].instanceId, "castle");
+  const reset = planConnectedBoardReset(layout, allocated, "castle").candidate;
+  const resetResult = run(layout, reset);
+  assert.equal(resetResult.additionalGlyphEffects[1].status, "unpurchased");
+  assert.equal(resetResult.legendaryGlyphPreviews[0].instanceId, "castle");
+  assert.equal(resetResult.legendaryGlyphModifiers.length, 2);
+  const removed = removeConnectedBoard(resources, layout, reset, "castle");
+  const removedResult = run(removed, reset, retainConnectedGlyphs(removed, glyphs));
+  assert.deepEqual(removedResult.additionalGlyphEffects, [result.additionalGlyphEffects[0]]);
+  assert.deepEqual(removedResult.legendaryGlyphModifiers, result.legendaryGlyphModifiers.slice(0, 2));
 });

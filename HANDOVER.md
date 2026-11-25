@@ -359,6 +359,13 @@ All six operation-1 glyphs use the pinned affix selector and scalar fields for b
 - **Conditional policy.** Active Rare conditional bonuses retain their native value. Outmatch L1 on Constrict gives 187.5 base Thorns, or 337.5 including its native +150 conditional contribution. Whether the game applies another amplification delta to the conditional component remains unresolved.
 - **Precision and presentation.** The calculator retains full floating-point precision through every pass. The coefficient displays one decimal. Core socket, local progress and global displays use provisional aggregate truncation. Non-core node and socket summaries use the planner’s decimal formatting. Exact global threshold inputs, local requirements, socket deltas and per-node components are visible in Advanced Calculation Details. At Challenger L10 the model predicts +2.72765 STR, displayed as +2 under this policy. The observed socket showed +3 and the observed global display rose by +2. The inferred L31 and final unamplified global 129 remain labeled in the fixtures. Exact game precision and attribute-specific runtime exceptions are open.
 
+### Chapter II, Stage 6B — Additional and Legendary glyph effects
+
+- All 21 glyphs expose Additional requirement progress from full-precision purchased core values in their own radius. The evaluator follows effective unconditional values, including applicable Primary amplification. A purchased, configured socket grants the passive when the local requirement is resolved and satisfied. Combat checks remain separate.
+- Additional records carry distinct damage multipliers, target debuffs, reduction, additive modifiers, resource generation and timed events. Eleven powers use the tooltip-supported `0.10` intrinsic calibration, with the runtime binding unresolved. The other ten use authored literal parameters.
+- Legendary records use the exact pinned scalars and provisional level-51 planner rarity. Locked and unpurchased previews are separate from applied records, and an unmet Additional requirement does not block Legendary application. Applied destinations retain their native ID, parameter and operator 7. Judicator has separate Holy and Fire entries, and generic Legendary damage retains its skill-damage destination.
+- The picker, socket tooltip and Advanced Calculation Details show the effect and eligibility states. Total Stats continues to show native and Primary numerical contributions. Additional combat behavior, Legendary stacking and the exact level-50 transaction remain unresolved. [Stage 6A evidence](research/paladin-glyph-stage-6a-evidence.md) · [Stage 6B implementation](research/paladin-glyph-stage-6b-implementation.md)
+
 ## Important files
 
 - `paragon-visual/index.html`, `style.css`, `app.js` — UI, rendering, interaction, persistence.
@@ -368,7 +375,8 @@ All six operation-1 glyphs use the pinned affix selector and scalar fields for b
 - `paragon-visual/glyph-picker.js` — glyph search, descriptive preview, level and socket controls.
 - `paragon-visual/glyph-progression.js` and `glyph-spatial.js` — pure level/radius/rarity derivation, socket lookup and source-cell Manhattan membership.
 - `paragon-visual/glyph-primary.js` and `tests/glyph-primary.test.mjs` — calibrated operation-2 evaluator, authored destination coverage and numerical fixtures.
-- `paragon-visual/glyph-amplification.js` and `tests/glyph-amplification.test.mjs` — operation-1 coefficients, eligible base contributions, local Additional diagnostics and numerical fixtures.
+- `paragon-visual/glyph-amplification.js` and `tests/glyph-amplification.test.mjs` — operation-1 coefficients, eligible base contributions, Stage 5B diagnostics and numerical fixtures.
+- `paragon-visual/glyph-effects.js` and `tests/glyph-effects.test.mjs` — shared local requirements, typed Additional effects, Legendary previews and modifiers, and the Stage 6A tooltip fixtures.
 - `research/paladin-glyph-stage-4b-evidence.md` — independent Canny validation and qualitative player confirmations after Stage 4A.
 - `tests/paladin-glyphs.test.mjs` — catalogue identity, authored references and planner level boundaries.
 - `tests/connected-boards.test.mjs` — pinned fixture tests for branching layouts, control placement, board resets, and draft compatibility.
@@ -398,7 +406,7 @@ All six operation-1 glyphs use the pinned affix selector and scalar fields for b
 
 ## Known limitations
 
-- Glyph progression shows derived radius and the planner rarity state. Both Primary mechanisms are calculated. Amplification Additional requirements have progress and activation diagnostics. Additional passive effects, Legendary numerical effects, combat effects, and board Legendary power calculation are deferred.
+- Glyph effects report planner eligibility and typed magnitudes. Combat dispatch, damage and DR composition, same-destination stacking, and the nine Legendary board-node powers remain unresolved.
 - The exact Legendary upgrade transaction, socket lifecycle and duplicate rules remain unresolved. The 0.033 intrinsic binding, exact game display behavior, stat-specific amplification exceptions, and Rare conditional amplification remain open.
 - Direct placement-scaling evidence is available for Knight at indices 1–3. Other source-derived placement predictions have the coverage described in Stage 2.
 - Formula-derived Castle Magic outputs are not all direct Castle tooltip observations, and power-budget intrinsic values must not be generalized beyond documented evidence.
@@ -508,8 +516,10 @@ Chapter II, Stage 5B passed all 43 automated tests with Chrome enabled and zero 
 
 Reviewed headless Chrome screenshots at 1440 × 1050 and emulated 390 × 740 for Normal, Magic and Rare amplification, node and socket details, Total Stats, Additional progress and exact Advanced Calculation Details. The mobile tooltip clears the zoom controls. A tall Rare tooltip may clip secondary lines at the board edge. Use Advanced Calculation Details for the complete breakdown.
 
+Chapter II, Stage 6B passed all 49 tests with headless Chrome enabled and zero skips. Fixtures reproduce all 21 Stage 6A Primary, Additional and Legendary tooltip records. Desktop and touch checks cover granted, unmet, locked, unpurchased and applied examples, restored effects, and readable typed destinations in the details panel. A separate 4,200-case Stage 5B comparison matched all native, Primary, global attribute and Rare threshold results. The focused-gate Delete failure from Stage 6A did not recur.
+
 ## Current boundary
 
 Boards 00–09 retain their historical inspection contexts, and Boards 01–09 support local rotation. The connected planner equips up to five boards and saves their glyph selections in version 2. Direct placement-scaling evidence covers Knight at positions 1–3. Other placement predictions and the Restorative selector caveat are documented in the multi-board threshold stage.
 
-For Chapter II, Stage 6, start from the pinned Additional affix and passive references and Stage 5B’s requirement diagnostics. Establish each supported effect’s trigger, magnitude, typed destination, and stacking evidence before adding any effect records. Preserve the Primary owned contributions and keep Legendary and unresolved conditional amplification on their separate evidence tracks. [Stage 1 Additional reference chain](research/paladin-paragon-glyph-research.md#additional-affixes-thresholds-and-powers)
+Stage 6B provides planner eligibility, sourced parameters and independent glyph modifier records. Runtime combat dispatch and stacking, conditional Rare amplification, the level-50 Legendary upgrade transaction, and the nine Legendary board-node powers remain open. [Stage 6B implementation](research/paladin-glyph-stage-6b-implementation.md)

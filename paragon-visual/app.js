@@ -3,9 +3,10 @@ import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
 import { BOARD_ROTATIONS, getBoardControlPositions, rotateBoardPoint } from "./board-rotation.js";
 import { getPaladinGlyph } from "./paladin-glyph-catalogue.js";
 import { getGlyphProgression } from "./glyph-progression.js";
-import { createGlyphEmblem, createGlyphPicker, describeAmplificationRequirement, describePrimaryGlyph, formatAmplifiedCore, formatGlyphPrimary } from "./glyph-picker.js";
+import { createGlyphEmblem, createGlyphPicker, describeAdditionalEffects, describeAdditionalRequirement, describeLegendaryEffects, describePrimaryGlyph, formatAmplifiedCore, formatGlyphPrimary } from "./glyph-picker.js";
 import { evaluatePrimaryGlyph } from "./glyph-primary.js";
-import { evaluateAmplificationAdditional, evaluateAmplificationGlyph } from "./glyph-amplification.js";
+import { evaluateAmplificationGlyph } from "./glyph-amplification.js";
+import { evaluateGlyphEffects } from "./glyph-effects.js";
 import {
   attachBoard, calculateConnectedBonuses, CONNECTED_SAVE_KEY, CONNECTED_SAVE_KEY_V2, createStartingLayout, MAX_BOARDS,
   configureConnectedGlyph, planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, removeConnectedBoard,
@@ -688,17 +689,26 @@ import {
         ? `${getPaladinGlyph(configuration.snoId).displayName} · Level ${progression.level} · Radius ${progression.radius} · ${progression.rarity}`
         : "Empty glyph socket";
       addText(tooltip, "p", "tooltip-trait", `${detail}. Open to manage.`);
+      const instanceId = node.instanceId ?? boardKey;
+      const index = nodeEvaluation?.nodeIndex;
+      const primary = [...(currentCalculation?.glyphEvaluations ?? []), ...(currentCalculation?.glyphPrimaryPreviews ?? [])]
+        .find(entry => entry.instanceId === instanceId && entry.socketSourceIndex === index);
+      if (primary) {
+        const label = primary.status === "unpurchased" ? "Primary preview" : "Primary";
+        addText(tooltip, "p", "glyph-primary-result", `${label} · ${describePrimaryGlyph(primary)}`);
+        const summary = primary.deltasByAttribute?.map(line => describeSocketDelta(line)).join(" · ");
+        if (summary) addText(tooltip, "p", "glyph-primary-result", summary);
+      }
+      const { additional, preview, modifiers } = getSocketEffects(currentCalculation, instanceId, index);
+      if (additional) {
+        addText(tooltip, "p", "glyph-primary-result", describeAdditionalRequirement(additional));
+        addText(tooltip, "p", "glyph-primary-result", describeAdditionalEffects(additional));
+      }
+      const legendary = describeLegendaryEffects(preview, modifiers);
+      if (legendary) addText(tooltip, "p", "glyph-primary-result", legendary);
     }
     for (const primary of currentCalculation?.glyphEvaluations ?? []) {
       if (primary.instanceId !== (node.instanceId ?? boardKey)) continue;
-      if (nodeEvaluation?.nodeIndex === primary.socketSourceIndex) {
-        addText(tooltip, "p", "glyph-primary-result", describePrimaryGlyph(primary));
-        if (primary.kind === "amplification" && primary.status === "active") {
-          const summary = primary.deltasByAttribute.map(line => describeSocketDelta(line)).join(" · ");
-          if (summary) addText(tooltip, "p", "glyph-primary-result", summary);
-          if (primary.additional) addText(tooltip, "p", "glyph-primary-result", describeAmplificationRequirement(primary.additional));
-        }
-      }
       if (primary.kind === "amplification") continue;
       const contribution = primary.contributions?.find(entry => entry.nodeId === id);
       if (contribution) {
@@ -1194,15 +1204,14 @@ import {
       allocated: allocatedNodeIds.has(node.id),
       eligible: getEligibleNodeIds().has(node.id),
       persistent,
-      evaluatePrimary(configuration) {
+      evaluateGlyph(configuration, saved) {
         const board = boardResources.get(boardKey);
         const input = {
           board: board.board, instanceId: node.instanceId ?? boardKey, sourceRevision: board.database.source.commit,
           configuration, nodeEvaluations: currentCalculation.nodeEvaluations
         };
-        const amplification = evaluateAmplificationGlyph(input);
-        if (!amplification) return evaluatePrimaryGlyph(input);
-        return { ...amplification, additional: evaluateAmplificationAdditional(amplification, input.board, input.nodeEvaluations) };
+        const primary = evaluateAmplificationGlyph(input) ?? evaluatePrimaryGlyph(input);
+        return { primary, ...evaluateGlyphEffects(input, primary, saved) };
       },
       describeSocketDelta,
       onAllocate() {
@@ -1859,7 +1868,7 @@ import {
         : formatRawBonusValue(totals.conditional, category);
       displays.total.textContent = formatRawBonusValue(totals.unconditional + totals.conditional + (totals.amplification ?? 0), category);
     }
-    const evaluations = result.glyphEvaluations ?? [];
+    const evaluations = [...(result.glyphEvaluations ?? []), ...(result.glyphPrimaryPreviews ?? [])];
     glyphCalculationList.replaceChildren();
     glyphCalculationDetails.hidden = evaluations.length === 0;
     const activeAmplification = evaluations.some(primary => primary.kind === "amplification" && primary.status === "active");
@@ -1875,7 +1884,9 @@ import {
       const evidence = primary.evidence === "source-derived-extrapolation" ? "Source-derived extrapolation"
         : primary.evidence === "experimentally-supported-amplification" ? "Experimentally supported"
           : "Calibrated with in-game observations";
-      addText(item, "p", "glyph-primary-result", `${describePrimaryGlyph(primary)} · ${evidence}`);
+      const label = primary.status === "unpurchased" ? "Primary preview" : "Primary";
+      addText(item, "p", "glyph-primary-result", `${label} · ${describePrimaryGlyph(primary)} · ${evidence}`);
+      renderSocketEffectDetails(item, getSocketEffects(result, primary.instanceId, primary.socketSourceIndex));
       if (primary.kind === "amplification" && primary.status === "active") {
         renderAmplificationDetails(item, primary, result.effectiveNodeContributions);
         for (const line of primary.contributions) amplifiedNodes.add(line.nodeId);
@@ -1903,17 +1914,41 @@ import {
     return `+${value}${line.units === "percentage-points" ? "%" : ""} ${label}`;
   }
 
+  function getSocketEffects(result, instanceId, socketSourceIndex) {
+    const ownsSocket = record => record.instanceId === instanceId && record.socketSourceIndex === socketSourceIndex;
+    return {
+      additional: result?.additionalGlyphEffects?.find(ownsSocket),
+      preview: result?.legendaryGlyphPreviews?.find(ownsSocket),
+      modifiers: result?.legendaryGlyphModifiers?.filter(ownsSocket) ?? []
+    };
+  }
+
+  function renderSocketEffectDetails(item, { additional, preview, modifiers }) {
+    if (additional) {
+      addText(item, "p", "glyph-primary-result", describeAdditionalRequirement(additional));
+      addText(item, "p", "", describeAdditionalEffects(additional));
+      for (const requirement of additional.requirements) {
+        addText(item, "p", "", `${attributeLabel(requirement.attribute.name)} · ${requirement.resolved ? "Native" : "Known native"} ${requirement.native} · Effective ${requirement.resolved ? requirement.effective : "unresolved"} · Required ${requirement.required}`);
+      }
+      const evidence = additional.parameterEvidence === "tooltip-calibrated-intrinsic"
+        ? "Tooltip-calibrated intrinsic. Runtime binding unresolved." : "Authored parameters match the observed tooltip.";
+      addText(item, "p", "", `${evidence} Passive combat application unresolved.`);
+    }
+    const legendary = describeLegendaryEffects(preview, modifiers);
+    if (legendary) {
+      addText(item, "p", "glyph-primary-result", legendary);
+      for (const { destination, fraction, aggregationOperator } of preview?.destinations ?? modifiers) {
+        addText(item, "p", "", `${destination.name} [${destination.id}/${destination.parameter}] · Fraction ${fraction} · Operator ${aggregationOperator}`);
+      }
+      addText(item, "p", "", "Tooltip-supported Legendary scaling. Combat stacking unresolved.");
+    }
+  }
+
   function renderAmplificationDetails(item, primary, effectiveLines) {
-    const { additional, glyphSnoId, instanceId } = primary;
+    const { glyphSnoId, instanceId } = primary;
     addText(item, "p", "", `Amplification fraction ${primary.fraction} · ${primary.percentagePoints}%`);
     if (primary.deltasByAttribute.length) {
       addText(item, "p", "", primary.deltasByAttribute.map(line => describeSocketDelta(line, true)).join(" · "));
-    }
-    if (additional) {
-      addText(item, "p", "glyph-primary-result", describeAmplificationRequirement(additional));
-      for (const requirement of additional.requirements) {
-        addText(item, "p", "", `${attributeLabel(requirement.attribute.name)} · Native ${requirement.native} · Effective ${requirement.effective} · Required ${requirement.required ?? "unresolved"}`);
-      }
     }
     if (primary.conditionalAmplificationPending) {
       addText(item, "p", "", "Rare conditional amplification unresolved. Active conditional bonuses keep their native values.");

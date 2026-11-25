@@ -20,11 +20,46 @@ export function formatAmplifiedCore(value) {
   return Math.trunc(value);
 }
 
-export function describeAmplificationRequirement(additional) {
+export function describeAdditionalRequirement(additional) {
   const values = additional.requirements.map(({ attribute, effective, required, resolved }) =>
     `${attribute.name.replace(/_Core$/, "")} ${resolved ? `${formatAmplifiedCore(effective)}/${required}` : "unresolved"}`);
   const status = additional.resolved ? additional.satisfied ? "satisfied" : "unmet" : "unresolved";
   return `Additional · ${values.join(" · ")} · ${status}`;
+}
+
+const percent = value => Number((value * 100).toFixed(8));
+
+function describePassiveEffect(effect) {
+  const { type, magnitude, unit, scope, predicate, alternative, trigger, per, cap, durationSeconds, cooldownSeconds,
+    cooldownScope, scalingStatus } = effect;
+  const suffix = type === "additive-modifier" ? "%[+]" : type === "damage-reduction" ? "% DR" : "%[x]";
+  const amount = value => unit === "fraction" ? `${percent(value)}${suffix}`
+    : `${value} ${unit === "seconds" ? "s" : unit}`;
+  const subject = type === "apply-vulnerable" ? "Vulnerable on the affected enemy"
+    : type === "cooldown-event" ? "off each active non-Aura cooldown"
+    : type === "resource-generation" ? "generated" : scope;
+  const value = magnitude === null ? `Up to ${amount(cap)}` : amount(magnitude);
+  const alternatives = alternative ? `, or ${amount(alternative.magnitude)} vs ${alternative.predicate}` : "";
+  const limit = cap !== undefined && magnitude !== null ? ` · Max ${amount(cap)}` : "";
+  const duration = durationSeconds === undefined ? "" : ` · ${durationSeconds} s duration`;
+  const cooldown = cooldownSeconds === undefined ? "" : ` · ${cooldownSeconds} s cooldown ${cooldownScope}`;
+  return `${value} ${subject}${per ? ` per ${per}` : ""}${predicate ? ` · ${predicate}` : ""}${alternatives}${limit}${trigger ? ` · Trigger: ${trigger}` : ""}${duration}${cooldown}${scalingStatus === "unresolved" ? " · Scaling unresolved" : ""}`;
+}
+
+export function describeAdditionalEffects(additional) {
+  const labels = { granted: "Granted", unmet: "Unmet", unpurchased: "Unpurchased socket",
+    unresolved: "Unresolved", preview: "Unsaved preview" };
+  return [labels[additional.status], ...additional.effects.map(describePassiveEffect)].join(" · ");
+}
+
+export function describeLegendaryEffects(preview, modifiers) {
+  const labels = { locked: `Locked preview until level ${LEGENDARY_GLYPH_LEVEL}`, unpurchased: "Unpurchased socket preview",
+    unresolved: "Unresolved", preview: "Unsaved preview", applied: "Applied" };
+  const status = preview?.status ?? modifiers[0]?.status;
+  if (!status) return "";
+  const destinations = (preview?.destinations ?? modifiers)
+    .map(({ fraction, scope }) => `${(100 * fraction).toFixed(1)}%[x] ${scope}`);
+  return [`Legendary · ${labels[status]}`, ...destinations].join(" · ");
 }
 
 export function describePrimaryGlyph(primary) {
@@ -97,12 +132,12 @@ export function createGlyphPicker(dialog, showDialog) {
 
   function renderProgression() {
     const current = getGlyphProgression(level.valueAsNumber);
-    const legendaryStatus = descriptions.querySelector(".glyph-legendary-status");
     progression.dataset.rarity = current?.rarity.toLowerCase() ?? "";
     const primaryDetails = descriptions.querySelector(".glyph-primary-result");
-    const primary = current ? session.evaluatePrimary({ snoId: preview.snoId, level: current.level }) : null;
+    const saved = session.configuration?.snoId === preview.snoId && session.configuration.level === current?.level;
+    const evaluation = current ? session.evaluateGlyph({ snoId: preview.snoId, level: current.level }, saved) : null;
+    const primary = evaluation?.primary;
     if (primary) {
-      const saved = session.configuration?.snoId === primary.glyphSnoId && session.configuration.level === current.level;
       const prefix = primary.status === "unresolved" ? "Unresolved"
         : !session.allocated ? "Preview · Purchase the socket to apply"
           : saved ? "Applied Primary" : "Unsaved preview";
@@ -113,17 +148,19 @@ export function createGlyphPicker(dialog, showDialog) {
     const socketSummary = descriptions.querySelector(".glyph-socket-summary");
     socketSummary.textContent = primary?.deltasByAttribute?.map(line => session.describeSocketDelta(line)).join(" · ") ?? "";
     const additionalProgress = descriptions.querySelector(".glyph-additional-progress");
-    additionalProgress.textContent = primary?.additional ? describeAmplificationRequirement(primary.additional) : "";
+    const additional = evaluation?.additionalEffect;
+    additionalProgress.textContent = additional ? describeAdditionalRequirement(additional) : "";
+    descriptions.querySelector(".glyph-additional-effects").textContent = additional ? describeAdditionalEffects(additional) : "";
+    descriptions.querySelector(".glyph-legendary-effect").textContent = evaluation
+      ? describeLegendaryEffects(evaluation.legendaryPreview, evaluation.legendaryModifiers)
+      : `Unlocks at planner level ${LEGENDARY_GLYPH_LEVEL}.`;
     if (!current) {
       progression.textContent = `Enter a whole level from ${level.min} to ${level.max}.`;
-      legendaryStatus.textContent = `Unlocks at planner level ${LEGENDARY_GLYPH_LEVEL}.`;
       return;
     }
     const next = current.nextRadiusLevel ? ` · Next radius at level ${current.nextRadiusLevel}` : "";
     const cap = current.atMaxLevel ? "Maximum level" : `Max ${level.max}`;
     progression.textContent = `Level ${current.level} · Radius ${current.radius} · ${current.rarity}${next} · ${cap}`;
-    legendaryStatus.textContent = current.rarity === "Legendary"
-      ? "Available by progression" : `Locked until planner level ${LEGENDARY_GLYPH_LEVEL}.`;
   }
 
   function renderPreview(glyph) {
@@ -141,16 +178,11 @@ export function createGlyphPicker(dialog, showDialog) {
       const section = document.createElement("section");
       const heading = document.createElement("h4");
       heading.textContent = caption;
-      const description = document.createElement("p");
-      description.textContent = affix.description;
       section.append(heading);
-      if (role === "legendary") {
-        const status = document.createElement("p");
-        status.className = "glyph-legendary-status";
-        section.append(status);
-      }
-      section.append(description);
       if (role === "primary") {
+        const description = document.createElement("p");
+        description.textContent = affix.description;
+        section.append(description);
         const result = document.createElement("p");
         result.className = "glyph-primary-result";
         section.append(result);
@@ -170,6 +202,11 @@ export function createGlyphPicker(dialog, showDialog) {
         const progress = document.createElement("p");
         progress.className = "glyph-primary-result glyph-additional-progress";
         section.append(progress);
+      }
+      if (role !== "primary") {
+        const effects = document.createElement("p");
+        effects.className = `glyph-primary-result ${role === "additional" ? "glyph-additional-effects" : "glyph-legendary-status glyph-legendary-effect"}`;
+        section.append(effects);
       }
       descriptions.append(section);
     }

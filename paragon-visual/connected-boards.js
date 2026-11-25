@@ -467,6 +467,10 @@ export function calculateConnectedBonuses(layout, allocated, externalAttributes,
   }
 
   const glyphEvaluations = results.flatMap(result => result.glyphEvaluations ?? []);
+  const glyphPrimaryPreviews = results.flatMap(result => result.glyphPrimaryPreviews ?? []);
+  const additionalGlyphEffects = results.flatMap(result => result.additionalGlyphEffects ?? []);
+  const legendaryGlyphPreviews = results.flatMap(result => result.legendaryGlyphPreviews ?? []);
+  const legendaryGlyphModifiers = results.flatMap(result => result.legendaryGlyphModifiers ?? []);
   const effectiveNodeContributions = results.flatMap(result => result.effectiveNodeContributions);
   const amplifiedCore = effectiveNodeContributions.some(line => line.category === "coreAttribute" && line.baseAmplificationDelta);
   return {
@@ -474,6 +478,10 @@ export function calculateConnectedBonuses(layout, allocated, externalAttributes,
     nodeEvaluations: results.flatMap(result => result.nodeEvaluations),
     unresolvedBonusCount: results.reduce((sum, result) => sum + result.unresolvedBonusCount, 0),
     ...(glyphEvaluations.length > 0 && { glyphEvaluations }),
+    ...(glyphPrimaryPreviews.length > 0 && { glyphPrimaryPreviews }),
+    ...(additionalGlyphEffects.length > 0 && { additionalGlyphEffects }),
+    ...(legendaryGlyphPreviews.length > 0 && { legendaryGlyphPreviews }),
+    ...(legendaryGlyphModifiers.length > 0 && { legendaryGlyphModifiers }),
     ...(amplifiedCore && { amplifiedThresholdEvidence: "source-derived-cross-board-model" }),
     verifiedParagonBonuses: {
       coreAttributes, rawBonuses,

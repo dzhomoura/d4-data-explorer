@@ -569,8 +569,12 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
     }
     const installGlyphChecks = () => evaluate(`
       window.glyphPicker = () => q('#glyph-picker');
-      window.glyphStats = () => JSON.stringify([points(), q('#allocated-count').textContent, q('#total-stats-list').textContent,
-        q('.advanced-details__content').textContent, tip(gate('board00',239))]);
+      window.glyphStats = () => {
+        const nativeDiagnostics = q('.advanced-details__content').cloneNode(true);
+        nativeDiagnostics.querySelector('#glyph-calculation-details').remove();
+        return JSON.stringify([points(), q('#allocated-count').textContent, q('#total-stats-list').textContent,
+          nativeDiagnostics.textContent, tip(gate('board00',239))]);
+      };
       window.glyphSearch = value => {
         const input = q('#glyph-search'); input.value = value; input.dispatchEvent(new Event('input', {bubbles:true}));
       };
@@ -614,6 +618,10 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
       check(q('#glyph-progression').textContent.includes('Radius 3 · Rare · Next radius at level 25')
         && q('.glyph-legendary-status').textContent.includes('Locked'), 'Low level previews a locked Legendary bonus');
       check(q('.glyph-requirement').textContent.includes('40 Strength'), 'Additional requirement is shown');
+      check(q('.glyph-additional-effects').textContent.includes('Unpurchased socket')
+        && q('.glyph-additional-effects').textContent.includes('18%[x]'), 'Unpurchased sockets show passive parameters');
+      check(q('.glyph-legendary-effect').textContent.includes('Locked preview until level 51')
+        && q('.glyph-legendary-effect').textContent.includes('8.6%[x]'), 'Locked Legendary displays the level-51 preview');
       q('#glyph-level').value = '151'; q('#glyph-save').click();
       check(glyphPicker().open && q('#glyph-level').getAttribute('aria-invalid') === 'true' && !glyphFor('board00'),
         'Out-of-range level is rejected without saving');
@@ -638,9 +646,11 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
     await evaluate(`
       enterGlyphLevel(50);
       check(q('#glyph-progression').textContent.includes('Radius 4 · Rare · Next radius at level 51'), 'Level 50 stays Rare');
+      check(q('.glyph-legendary-effect').textContent.includes('Locked preview'), 'Level 50 keeps the Legendary modifier locked');
       enterGlyphLevel(51);
+      check(q('.glyph-legendary-effect').textContent.includes('Unpurchased socket preview'), 'Level 51 still needs a purchased socket');
       check(q('#glyph-progression').textContent.includes('Radius 5 · Legendary')
-        && q('.glyph-legendary-status').textContent === 'Available by progression', 'Level 51 previews Legendary immediately');
+        && q('.glyph-legendary-status').textContent.includes('8.6%[x]'), 'Level 51 previews Legendary immediately');
       enterGlyphLevel(150);
       check(q('#glyph-progression').textContent.includes('Maximum level'), 'Maximum glyph level is shown');
       q('#glyph-save').click();
@@ -812,7 +822,12 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
     await evaluate(`socket().click();
       check(q('#glyph-picker .glyph-primary-result').textContent.includes('Applied Primary') && q('#glyph-picker .glyph-primary-result').textContent.includes('+53.0%'),
         'Socket panel shows the applied total');
-      check(q('.glyph-legendary-status').textContent === 'Available by progression', 'Legendary description retains progression status');`);
+      check(q('.glyph-additional-progress').textContent.includes('22/25')
+        && q('.glyph-additional-effects').textContent.startsWith('Unmet'), 'Canny Additional remains unmet');
+      check(q('.glyph-legendary-effect').textContent.includes('Applied · 15.4%[x] Non-Physical damage'),
+        'Legendary applies independently of the Additional requirement');
+      check(q('#glyph-calculation-list').textContent.includes('[257/-1]') && q('#glyph-calculation-list').textContent.includes('Operator 7'),
+        'Advanced details retain native Legendary identity and operator');`);
     await screenshot("glyph-primary-desktop-socket");
     await evaluate(`q('#glyph-picker-close').click();
       gate('board00',179).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
@@ -829,7 +844,10 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
     await screenshot("glyph-primary-mobile-node-and-total");
     await tap("gate('board00',136)");
     await evaluate(`check(q('#glyph-picker .glyph-primary-result').textContent.includes('+53.0%'), 'Mobile shows the restored socket total');
-      q('#glyph-picker .glyph-primary-result').scrollIntoView({block:'nearest',container:'nearest'});`);
+      check(q('.glyph-legendary-effect').textContent.includes('Applied · 15.4%[x]'), 'Mobile preserves the applied Legendary record after reload');
+      q('.glyph-legendary-effect').scrollIntoView({block:'nearest',container:'nearest'});
+      const effects = q('.glyph-legendary-effect').getBoundingClientRect(), panel = q('.glyph-preview').getBoundingClientRect();
+      check(effects.top >= panel.top && effects.bottom <= panel.bottom, 'Mobile Legendary preview can scroll fully into view');`);
     await screenshot("glyph-primary-mobile-socket");
     await evaluate(`q('#glyph-remove').click();
       check(!q('[data-stat-key="raw:nonPhysicalDamage"]') && !save().boards[0].glyph, 'Removing the glyph clears its calculated and saved state');`);
@@ -894,7 +912,8 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
         await evaluate(`(() => {
           const detail = tip(${socketNode});
           check(detail.includes('${heading}') && detail.includes('${attribute}'), 'Socket tooltip shows magnitude, target and aggregate');
-          if ('${rarity}' === 'normal') check(detail.includes('Additional') && detail.includes('satisfied'), 'Challenger Additional requirement is satisfied');
+          if ('${rarity}' === 'normal') check(detail.includes('Additional') && detail.includes('satisfied')
+            && detail.includes('Granted · 18%[x]') && detail.includes('Locked preview until level 51'), 'Challenger shows granted passive and locked Legendary');
           ${socketNode}.click();
           check(q('#glyph-picker .glyph-socket-summary').textContent.includes('${attribute}'), 'Picker shows socket totals');
           q('#glyph-picker .glyph-additional-progress').scrollIntoView({block:'end',container:'nearest'});
@@ -916,6 +935,8 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
         check(q('#glyph-calculation-list').textContent.includes('0.44255')
           && q('#glyph-calculation-list').textContent.includes('Active conditional')
           && q('#amplification-global-details').textContent.includes('Exact global threshold inputs'), 'Diagnostics preserve exact component and global values');
+        check(qa('#glyph-calculation-list p').every(line => line.scrollWidth <= line.clientWidth + 1),
+          'Glyph evidence and typed destinations wrap within Advanced Calculation Details');
         q('#glyph-calculation-details').scrollIntoView({block:'start'});`);
       await painted();
       await screenshot(`glyph-amplification-${viewport}-advanced`);

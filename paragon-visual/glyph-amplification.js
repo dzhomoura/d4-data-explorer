@@ -1,3 +1,4 @@
+import { evaluateAdditionalRequirements } from "./glyph-effects.js";
 import { getPaladinGlyph, paladinGlyphCatalogue } from "./paladin-glyph-catalogue.js";
 import { getGlyphProgression } from "./glyph-progression.js";
 import { getGlyphRadiusMembership } from "./glyph-spatial.js";
@@ -73,33 +74,8 @@ export function evaluateAmplificationGlyph({ board, instanceId, sourceRevision, 
 export function evaluateAmplificationAdditional(primary, board, nodeEvaluations) {
   if (primary?.status !== "active") return null;
   const affix = paladinGlyphCatalogue.affixes[getPaladinGlyph(primary.glyphSnoId).bonuses.additional];
-  const requirements = affix.thresholdSnoIds.flatMap(id => paladinGlyphCatalogue.thresholds[id].requirements);
-  if (!requirements.length) return null;
-
   const membership = getGlyphRadiusMembership(board, primary.instanceId, primary.radius);
-  const byIndex = new Map(nodeEvaluations.filter(node => node.instanceId === primary.instanceId)
-    .map(node => [node.nodeIndex, node]));
-  const effectiveBases = new Map(primary.contributions.map(line => [`${line.sourceIndex}:${line.attributeIndex}`, line.effectiveBase]));
-  const evaluated = requirements.map(({ attribute, amount }) => {
-    let native = 0;
-    let effective = 0;
-    let resolved = Number.isFinite(amount);
-    for (const { sourceIndex } of membership.nodes) {
-      const node = byIndex.get(sourceIndex);
-      if (!node?.allocated) continue;
-      for (const line of node.attributes) {
-        if (line.attributeId !== attribute.id || line.attributeParam !== attribute.parameter) continue;
-        if (!Number.isFinite(line.unconditional)) {
-          resolved = false;
-          continue;
-        }
-        native += line.unconditional;
-        effective += effectiveBases.get(`${sourceIndex}:${line.attributeIndex}`) ?? line.unconditional;
-      }
-    }
-    return { attribute, required: amount, native, effective, resolved, satisfied: resolved ? effective >= amount : null };
+  return evaluateAdditionalRequirements({
+    membership, instanceId: primary.instanceId, nodeEvaluations, affix, primary, validSource: Boolean(membership)
   });
-  const resolved = evaluated.every(requirement => requirement.resolved);
-  return { affixSnoId: affix.snoId, requirements: evaluated, resolved,
-    satisfied: resolved ? evaluated.every(requirement => requirement.satisfied) : null };
 }
