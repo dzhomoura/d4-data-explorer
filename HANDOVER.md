@@ -56,6 +56,8 @@ External attributes remain editable and locally persisted above the board. Their
 
 The workspace header keeps point and node counts, save status, reset, and interaction feedback together. Help contains the allocation instructions and provisional costs. Enter Fullscreen expands the same interactive board with its canvas controls, pickers, legend, and Total Stats. Chrome can use native fullscreen. When the API is unavailable or denied, the viewport-filling fallback preserves the camera and returns focus and page scroll on exit. Advanced Calculation Details and External Attributes remain in the normal page. [Chapter IV Stage 1 implementation and screenshots](research/paladin-ui-chapter-4-stage-1.md)
 
+Node tooltips use localized names or verified bonus labels, rarity styling, and concise allocation and effect states. Rare cards separate effective base bonuses from the threshold bonus and show each requirement's progress. Legendary and glyph cards distinguish scenario outcomes and locked or unpurchased effects. The **Node Details** button or **I** on a focused node opens the full player summary and technical evidence, including exact source and calculation records. [Chapter IV Stage 2 implementation and screenshots](research/paladin-ui-chapter-4-stage-2.md)
+
 ### Board 00
 
 - 75 occupied cells and 17 definitions.
@@ -531,6 +533,8 @@ Chapter II, Stage 6B passed all 49 tests with headless Chrome enabled and zero s
 Chapter III, Stage 1B passed all 59 tests with headless Chrome and zero skips, including desktop and mobile Legendary scenario checks. Neither historical gate-key failure recurred. A separate 1,680-case comparison matched native, Rare threshold and glyph results against the Stage 1A checkout.
 
 Chapter IV, Stage 1 passed all 61 tests with headless Chrome and zero skips. The checks include real Fullscreen API entry and exit, an exit initiated outside the workspace toggle, mobile fallback, camera and Fit behavior, and board and glyph interactions with the workspace expanded. The same allocation, save, and calculation regressions passed. Physical Escape in native fullscreen, browser-level exit controls, and physical mobile browser chrome still require manual verification. [Stage 1 verification and reviewed captures](research/paladin-ui-chapter-4-stage-1.md#screenshot-review)
+
+Chapter IV, Stage 2 passed all 63 tests with headless Chrome and zero skips. The original 61 tests passed alongside new coverage for player-facing naming, threshold and Legendary states, diagnostic access, rotation, and viewport edges. Twelve desktop and emulated mobile screenshots were reviewed. [Stage 2 verification and reviewed captures](research/paladin-ui-chapter-4-stage-2.md#reviewed-screenshots)
 
 ## Current boundary
 

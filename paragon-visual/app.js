@@ -350,6 +350,12 @@ import {
   const zoomOutButton = document.getElementById("zoom-out");
   const resetButton = document.getElementById("zoom-reset");
   const tooltip = document.getElementById("node-tooltip");
+  const nodeDetails = document.getElementById("node-details");
+  const nodeDetailsButton = document.getElementById("node-details-open");
+  const nodeDetailsSelect = document.getElementById("node-details-select");
+  const nodeDetailsSummary = document.getElementById("node-details-summary");
+  const nodeDetailsEvidence = document.getElementById("node-details-evidence");
+  const nodeDetailsRecords = document.getElementById("node-details-records");
   const EXPECTED_SOURCE_COMMIT = "75e619f0d90a0951945747f45feef59c076a5db0";
   const ATTRIBUTE_LABELS = {
     Strength_Core: "Strength",
@@ -417,9 +423,9 @@ import {
     magic: "Magic",
     rare: "Rare",
     legendary: "Legendary",
-    socket: "Glyph socket",
+    socket: "Glyph Socket",
     gate: "Gate",
-    start: "Starting node",
+    start: "Starting Node",
     unknown: "Node"
   };
 
@@ -429,7 +435,10 @@ import {
   let drag = null;
   let boardPixelWidth = 0;
   let boardPixelHeight = 0;
-  let activeTooltipMarker = null;
+  let activeTooltipNode = null;
+  let lastTooltipNode = null;
+  let nodeDetailsIds = [];
+  let nodeEvaluations = new Map();
   let boardNodes = new Map();
   let allocationGraph = new Map();
   let allocatedNodeIds = new Set();
@@ -522,251 +531,331 @@ import {
     return `${sign}${Number.isInteger(value) ? value : Number(value.toFixed(2))}%`;
   }
 
-  function getThresholdEvaluation(nodeEvaluation, thresholdName) {
-    return nodeEvaluation?.thresholds.find((threshold) => threshold.thresholdReference === thresholdName) || null;
+  function playerAttributeLabel(attribute) {
+    if (attribute.category === "lifePer5Seconds") return ATTRIBUTE_LABELS[attribute.attributeName] ?? RAW_BONUS_LABELS.lifePer5Seconds;
+    return RAW_BONUS_LABELS[attribute.category]
+      || ATTRIBUTE_LABELS[attribute.attributeName ?? attribute.name] || "Bonus";
   }
 
-  function buildTooltip(node) {
-    const { definition, id, boardId } = node;
-    const boardKey = boardId ?? currentBoardKey;
-    const config = BOARD_CONFIGS[boardKey];
-    const nodeEvaluation = currentCalculation?.nodeEvaluations.find(evaluation => (evaluation.nodeId ?? evaluation.nodeIndex) === id);
-    const legendaryEffects = (currentCalculation?.legendaryNodeEffects ?? []).filter(effect =>
-      effect.instanceId === (node.instanceId ?? boardKey) && effect.sourceIndex === nodeEvaluation?.nodeIndex);
-    tooltip.replaceChildren();
-
-    const header = document.createElement("header");
-    header.className = "tooltip-header";
-    addText(header, "h2", "tooltip-title", legendaryEffects[0]?.nodeName ?? definition.name);
-    addText(header, "span", `tooltip-kind tooltip-kind--${definition.kind}`, KIND_LABELS[definition.kind] || "Node");
-    tooltip.appendChild(header);
-
-    if (boardId) addText(tooltip, "p", "tooltip-meta", config.label);
-    if (!legendaryEffects.length && nodeEvaluation?.displayName) {
-      addText(tooltip, "p", "tooltip-display-name", nodeEvaluation.displayName);
-    }
-    addText(
-      tooltip,
-      "p",
-      "tooltip-meta",
-      `SNO ${definition.snoId} · Rarity override ${definition.rarityOverride ?? "unknown"}`
-    );
-
-    if (legendaryEffects.length) {
-      renderLegendaryNodeTooltip(tooltip, legendaryEffects);
-    } else if (definition.attributes.length === 0) {
-      addText(tooltip, "p", "tooltip-empty", "No bonus attributes are defined for this node.");
-    } else {
-      const attributes = document.createElement("section");
-      attributes.className = "tooltip-attributes";
-      addText(attributes, "h3", "tooltip-section-title", "Attributes");
-
-      for (let attributeIndex = 0; attributeIndex < definition.attributes.length; attributeIndex += 1) {
-        const attribute = definition.attributes[attributeIndex];
-        const calculation = nodeEvaluation?.attributes[attributeIndex];
-        const row = document.createElement("article");
-        row.className = "tooltip-attribute";
-        addText(row, "p", "tooltip-attribute-name", attributeLabel(attribute.name));
-        addText(row, "code", "tooltip-attribute-source", attribute.name);
-
-        if (calculation && !calculation.unresolved && calculation.unconditional !== null) {
-          const valueLabel = calculation.category === "coreAttribute"
-            ? attributeLabel(attribute.name)
-            : RAW_BONUS_LABELS[calculation.category];
-          const basePrefix = calculation.provenance === "verified-game-formula"
-            ? "Verified bonus"
-            : calculation.threshold ? "Base bonus" : "Raw bonus";
-          addText(
-            row,
-            "p",
-            "tooltip-bonus tooltip-bonus--verified",
-            `${basePrefix}: ${formatBonusValue(calculation.unconditional, calculation.category)} ${valueLabel}`
-          );
-          if (calculation.amplification) {
-            const { baseAmplificationDelta, effectiveAmount } = calculation.amplification;
-            const category = calculation.category === "coreAttribute" ? "core" : calculation.category;
-            addText(row, "p", "glyph-primary-result", `Glyph amplification ${formatRawBonusValue(baseAmplificationDelta, category)} · Effective ${formatRawBonusValue(effectiveAmount, category)} ${valueLabel}`);
-          }
-          if (calculation.conditionalAmplificationStatus) {
-            addText(row, "p", "tooltip-formula-note", "Conditional amplification unresolved · native conditional value used.");
-          }
-          if (calculation.conditional === null) {
-            addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", calculation.threshold?.reason ?? "Conditional amount unresolved.");
-          } else if (calculation.conditional > 0) {
-            addText(
-              row,
-              "p",
-              "tooltip-bonus tooltip-bonus--conditional",
-              `Additional threshold bonus: ${formatBonusValue(calculation.conditional, calculation.category)} ${valueLabel}`
-            );
-            const threshold = calculation.threshold;
-            if (threshold?.resolved) {
-              const requirementProgress = threshold.requirements
-                ? threshold.requirements.map((requirement) => `${requirement.requiredAttribute} ${formatAmplifiedCore(requirement.currentValue)} / ${requirement.requiredValue}`).join("; ")
-                : `${threshold.requiredAttribute} ${formatAmplifiedCore(threshold.currentValue)} / ${threshold.requiredValue}`;
-              const thresholdText = `${requirementProgress} · ${threshold.satisfied ? "satisfied" : "not satisfied"}`;
-              addText(row, "p", `tooltip-threshold-progress${threshold.satisfied ? " tooltip-threshold-progress--met" : ""}`, thresholdText);
-              if (!nodeEvaluation.allocated && threshold.satisfied) {
-                addText(row, "p", "tooltip-formula-note", "Threshold met; bonus applies when this node is allocated.");
-              } else if (nodeEvaluation.allocated) {
-                addText(row, "p", "tooltip-formula-note", threshold.satisfied ? "Conditional bonus is active." : "Conditional bonus is inactive.");
-              }
-            } else {
-              addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", `Threshold unresolved: ${threshold?.reason || "no verified requirement"}`);
-            }
-          }
-          if (calculation.provenance) {
-            const evidenceLabel = calculation.provenance === "verified-game-formula"
-              ? "Verified from pinned game formula"
-              : calculation.provenance === "direct-in-game"
-                ? "Direct in-game observation"
-                : calculation.provenance === "unamplified-planner"
-                  ? "Unamplified planner observation"
-                  : calculation.provenance === "formula-derived"
-                    ? "Pinned formula derived from observed shared multiplier"
-                    : "Unspecified evidence source";
-            addText(row, "p", "tooltip-evidence", `Native value · ${evidenceLabel}`);
-          }
-        } else if (attribute.verifiedBonus !== null) {
-          const value = Number(attribute.verifiedBonus);
-          const sign = value > 0 ? "+" : "";
-          addText(row, "p", "tooltip-bonus tooltip-bonus--verified", `Verified bonus: ${sign}${value} ${attributeLabel(attribute.name)}`);
-        } else if (attribute.formulaReference && attribute.formulaValue !== null) {
-          addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", `Formula constant: ${attribute.formulaValue}`);
-          addText(row, "p", "tooltip-formula-note", "Effective node bonus unresolved; this attribute also has a separate node literal.");
-        } else {
-          addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", "Bonus value unresolved");
-        }
-
-        if (attribute.formulaReference) {
-          addText(row, "p", "tooltip-formula", `Formula: ${attribute.formulaReference}`);
-        }
-        if (attribute.literalFormula !== null && attribute.literalFormula !== "") {
-          addText(row, "p", "tooltip-formula-note", `Node literal: ${attribute.literalFormula} (not treated as a final bonus)`);
-        }
-        attributes.appendChild(row);
-      }
-
-      tooltip.appendChild(attributes);
-    }
-
-    if (definition.thresholdReferences.length > 0) {
-      const thresholds = document.createElement("section");
-      thresholds.className = "tooltip-thresholds";
-      addText(thresholds, "h3", "tooltip-section-title", "Thresholds");
-      const list = document.createElement("ul");
-      for (const threshold of definition.thresholdReferences) {
-        const evaluation = getThresholdEvaluation(nodeEvaluation, threshold.name);
-        const unresolvedFormula = evaluation?.formula
-          || evaluation?.requirements?.map((requirement) => `${requirement.requiredAttribute}: ${requirement.formula}`).join("; ")
-          || null;
-        const label = evaluation?.resolved
-          ? evaluation.requirements
-            ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${formatAmplifiedCore(requirement.currentValue)}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
-            : `${threshold.name}: ${evaluation.requiredAttribute} ${formatAmplifiedCore(evaluation.currentValue)}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
-          : evaluation || config.unverifiedRareThresholds
-            ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
-            : `${threshold.name}: not evaluated`;
-        const className = evaluation?.resolved
-          ? `tooltip-threshold${evaluation.satisfied ? " tooltip-threshold--met" : ""}`
-          : "tooltip-threshold tooltip-threshold--unresolved";
-        addText(list, "li", className, label);
-      }
-      thresholds.appendChild(list);
-      const thresholdNote = node.instanceId
-        ? "Rare thresholds use this board’s placement and total character attributes."
-        : config.unverifiedRareThresholds
-        ? "This board’s Rare conditional amounts and requirements remain unverified."
-        : config.observedRareThresholds
-          ? `Rare thresholds use total attributes and the observed equip-index-${config.boardEquipIndex} requirements.`
-          : boardKey === "board00"
-            ? "Only the in-game verified starting-board requirement is evaluated."
-            : boardKey === "board03"
-              ? "Fervent thresholds use total attributes and the observed equip-index-3 requirements."
-              : "Castle thresholds are evaluated only for the observed equip-index-1 context.";
-      addText(
-        thresholds,
-        "p",
-        "tooltip-formula-note",
-        thresholdNote
-      );
-      tooltip.appendChild(thresholds);
-    }
-
-    if (definition.passivePower && !legendaryEffects.length) {
-      addText(tooltip, "p", "tooltip-trait", `Legendary power: ${definition.passivePower.name} (effect unresolved)`);
-    }
-    if (definition.hasSocket) {
-      const configuration = getSocketGlyph(node);
-      const progression = configuration && getGlyphProgression(configuration.level);
-      const detail = progression
-        ? `${getPaladinGlyph(configuration.snoId).displayName} · Level ${progression.level} · Radius ${progression.radius} · ${progression.rarity}`
-        : "Empty glyph socket";
-      addText(tooltip, "p", "tooltip-trait", `${detail}. Open to manage.`);
-      const instanceId = node.instanceId ?? boardKey;
-      const index = nodeEvaluation?.nodeIndex;
-      const primary = [...(currentCalculation?.glyphEvaluations ?? []), ...(currentCalculation?.glyphPrimaryPreviews ?? [])]
-        .find(entry => entry.instanceId === instanceId && entry.socketSourceIndex === index);
-      if (primary) {
-        const label = primary.status === "unpurchased" ? "Primary preview" : "Primary";
-        addText(tooltip, "p", "glyph-primary-result", `${label} · ${describePrimaryGlyph(primary)}`);
-        const summary = primary.deltasByAttribute?.map(line => describeSocketDelta(line)).join(" · ");
-        if (summary) addText(tooltip, "p", "glyph-primary-result", summary);
-      }
-      const { additional, preview, modifiers } = getSocketEffects(currentCalculation, instanceId, index);
-      if (additional) {
-        addText(tooltip, "p", "glyph-primary-result", describeAdditionalRequirement(additional));
-        addText(tooltip, "p", "glyph-primary-result", describeAdditionalEffects(additional));
-      }
-      const legendary = describeLegendaryEffects(preview, modifiers);
-      if (legendary) addText(tooltip, "p", "glyph-primary-result", legendary);
-    }
-    for (const primary of currentCalculation?.glyphEvaluations ?? []) {
-      if (primary.instanceId !== (node.instanceId ?? boardKey)) continue;
-      if (primary.kind === "amplification") continue;
-      const contribution = primary.contributions?.find(entry => entry.nodeId === id);
-      if (contribution) {
-        const amount = formatGlyphPrimary(contribution.percentagePoints, primary.destination);
-        addText(tooltip, "p", "glyph-primary-result", `${primary.glyphName} Primary · ${amount} ${primary.label}`);
-      }
+  function nodeTitle(node, evaluation = nodeEvaluations.get(node.id)) {
+    const { definition, marker } = node;
+    if (definition.kind === "legendary" && evaluation) {
+      const effect = currentCalculation?.legendaryNodeEffects?.find(record =>
+        record.instanceId === evaluation.instanceId && record.sourceIndex === evaluation.nodeIndex);
+      if (effect) return effect.nodeName;
     }
     if (definition.isGate) {
-      const direction = node.marker.dataset.gateDirection;
-      addText(tooltip, "p", "tooltip-trait", direction ? `Board gate · ${direction}` : "Board gate");
-      if (canAttachAtGate(node)) {
-        addText(tooltip, "p", "tooltip-trait", "Use + beside this gate or its board menu to attach a board.");
+      const direction = marker.dataset.gateDirection;
+      return direction ? `${direction} Gate` : "Board Gate";
+    }
+    return evaluation?.displayName || definition.displayName || (definition.attributes.length
+      ? [...new Set((evaluation?.attributes ?? definition.attributes).map(playerAttributeLabel))].join(" and ")
+      : KIND_LABELS[definition.kind] || "Paragon Node");
+  }
+
+  function getNodeTooltipRecords(node) {
+    const boardKey = node.boardId ?? currentBoardKey;
+    const evaluation = nodeEvaluations.get(node.id);
+    const instanceId = node.instanceId ?? boardKey;
+    const sourceIndex = node.sourceIndex ?? node.id;
+    const legendaryEffects = (currentCalculation?.legendaryNodeEffects ?? []).filter(effect =>
+      effect.instanceId === instanceId && effect.sourceIndex === sourceIndex);
+    const primary = [...(currentCalculation?.glyphEvaluations ?? []), ...(currentCalculation?.glyphPrimaryPreviews ?? [])]
+      .filter(record => record.instanceId === instanceId);
+    return { evaluation, legendaryEffects, primary, boardKey, sourceIndex, instanceId };
+  }
+
+  function renderRareRequirement(parent, calculation) {
+    const threshold = calculation.threshold;
+    const extra = document.createElement("section");
+    extra.className = "node-card-section";
+    parent.append(extra);
+    addText(extra, "h3", "", "Additional threshold bonus");
+    if (Number.isFinite(calculation.conditional)) {
+      const amount = formatBonusValue(calculation.conditional, calculation.category);
+      addText(extra, "p", "node-card-bonus", `${amount} ${playerAttributeLabel(calculation)}`);
+    }
+    if (threshold?.resolved) {
+      const requirements = document.createElement("ul");
+      requirements.className = "node-card-requirements";
+      extra.append(requirements);
+      for (const requirement of threshold.requirements ?? [threshold]) {
+        const { requiredAttribute, currentValue, requiredValue, satisfied } = requirement;
+        const row = addText(requirements, "li", satisfied ? "is-met" : "is-unmet", "");
+        addText(row, "span", "", `${requiredAttribute} ${formatAmplifiedCore(currentValue)} / ${requiredValue}`);
+        addText(row, "span", "node-card-requirement-state", satisfied ? "Met" : "Unmet");
+        if (requiredValue > 0) {
+          const progress = document.createElement("progress");
+          progress.max = requiredValue;
+          progress.value = Math.min(currentValue, requiredValue);
+          progress.setAttribute("aria-hidden", "true");
+          row.append(progress);
+        }
       }
     }
+    const status = calculation.conditionalApplied ? "Conditional bonus is active."
+      : threshold?.satisfied ? "Requirements met. Allocate this node to gain the bonus."
+      : threshold?.resolved ? "Conditional bonus is inactive."
+      : "Threshold or bonus value is unresolved.";
+    addText(extra, "p", "node-card-note", status);
+    if (calculation.conditionalAmplificationStatus) {
+      addText(extra, "p", "node-card-note", "Conditional amplification unresolved. Uses the native threshold bonus.");
+    }
+  }
+
+  function renderPlayerTooltip(target, node, { evaluation, legendaryEffects, primary, instanceId, sourceIndex }) {
+    const { definition, id } = node;
+    const { kind } = definition;
+    const glyph = definition.hasSocket ? getSocketGlyph(node) : null;
+    const glyphName = glyph && getPaladinGlyph(glyph.snoId).displayName;
+    target.replaceChildren();
+    target.dataset.rarity = kind;
+    const header = document.createElement("header");
+    header.className = "node-card-header";
+    addText(header, "h2", "", glyphName || nodeTitle(node, evaluation));
+    addText(header, "span", "node-card-kind", KIND_LABELS[kind] || "Node");
+    target.append(header);
+
+    const state = legendaryEffects.length
+      ? legendaryEffects[0].grantStatus === "granted" ? "Allocated · Granted" : "Unallocated preview"
+      : allocatedNodeIds.has(id) ? "Allocated"
+      : definition.isGate && allocationRootId === null ? "Available as local entry"
+      : node.marker.classList.contains("node--eligible") ? "Available to allocate"
+      : "Unallocated · Connect an allocated path";
+    addText(target, "p", "node-card-state", state);
+
+    if (legendaryEffects.length) {
+      renderLegendaryNodeTooltip(target, legendaryEffects);
+      return;
+    }
+    if (definition.hasSocket) {
+      if (!glyph) {
+        addText(target, "p", "node-card-power", "Empty socket. Open to assign a glyph or allocate the socket.");
+        return;
+      }
+      const { level, radius, rarity } = getGlyphProgression(glyph.level);
+      addText(target, "p", "node-card-power", `Level ${level} · Radius ${radius} · ${rarity} glyph`);
+      const socketPrimary = primary.find(entry => entry.socketSourceIndex === sourceIndex);
+      const section = addText(target, "section", "node-card-section", "");
+      if (socketPrimary) {
+        const label = socketPrimary.status === "unpurchased" ? "Primary preview" : "Primary";
+        addText(section, "p", "", `${label} · ${describePrimaryGlyph(socketPrimary)}`);
+        const summary = socketPrimary.deltasByAttribute?.map(line => describeSocketDelta(line)).join(" · ");
+        if (summary) addText(section, "p", "node-card-note", summary);
+      }
+      const { additional, preview, modifiers } = getSocketEffects(currentCalculation, instanceId, sourceIndex);
+      if (additional) {
+        addText(section, "p", "", describeAdditionalRequirement(additional));
+        addText(section, "p", "node-card-note", describeAdditionalEffects(additional));
+      }
+      const legendary = describeLegendaryEffects(preview, modifiers);
+      if (legendary) addText(section, "p", "", legendary);
+      return;
+    }
+
+    const attributes = evaluation?.attributes ?? [];
+    if (attributes.length) {
+      const base = addText(target, "ul", "node-card-bonuses", "");
+      for (const calculation of attributes) {
+        const label = playerAttributeLabel(calculation);
+        const row = addText(base, "li", "", "");
+        if (calculation.unresolved) {
+          addText(row, "p", "node-card-note", `${label} value unresolved`);
+          continue;
+        }
+        const { amplification, category, unconditional } = calculation;
+        const format = value => amplification ? formatRawBonusValue(value, category === "coreAttribute" ? "core" : category)
+          : formatBonusValue(value, category);
+        const amount = format(amplification?.effectiveBase ?? unconditional);
+        addText(row, "p", "node-card-bonus", `${amount} ${label}${amplification ? " · Effective base" : ""}`);
+        if (amplification) {
+          addText(row, "p", "node-card-note", `Native ${format(unconditional)} · Glyph amplification ${format(amplification.baseAmplificationDelta)}`);
+        }
+      }
+    }
+    for (const calculation of attributes) {
+      if (calculation.conditional === null || calculation.conditional > 0) renderRareRequirement(target, calculation);
+    }
+    for (const entry of primary) {
+      if (entry.kind === "amplification") continue;
+      const contribution = entry.contributions?.find(line => line.nodeId === id);
+      if (contribution) {
+        const amount = formatGlyphPrimary(contribution.percentagePoints, entry.destination);
+        addText(target, "p", "node-card-note", `${entry.glyphName} Primary · ${amount} ${entry.label}`);
+      }
+    }
+    if (kind === "start") addText(target, "p", "node-card-power", "Your allocation path starts here. Costs 0 points.");
+    if (definition.isGate) {
+      const info = node.instanceId ? canAttachAtGate(node)
+        ? "Connect another board at this gate. Use + or the board menu to attach."
+        : connectedLayout.gateOccupancy.has(id) ? "This gate connects two equipped boards."
+        : "Board connection gate."
+        : "Choose a gate to anchor a local allocation path in the inspector.";
+      addText(target, "p", "node-card-power", info);
+    }
+    if (definition.passivePower) addText(target, "p", "node-card-note", "Legendary effect unresolved.");
+  }
+
+  function renderNodeDetails() {
+    const node = boardNodes.get(nodeDetailsIds[Number(nodeDetailsSelect.value)]);
+    if (!node) return;
+    const records = getNodeTooltipRecords(node);
+    const { evaluation, legendaryEffects, sourceIndex, instanceId, primary, boardKey } = records;
+    const { definition } = node;
+    renderPlayerTooltip(nodeDetailsSummary, node, records);
+    nodeDetailsEvidence.replaceChildren();
+    addText(nodeDetailsEvidence, "h3", "", "Technical evidence");
+    addText(nodeDetailsEvidence, "p", "", `${definition.name} · SNO ${definition.snoId} · Cell ${sourceIndex} · Rarity override ${definition.rarityOverride ?? "unknown"}`);
+    addText(nodeDetailsEvidence, "p", "", definition.sourcePath);
+    const provenance = {
+      "verified-game-formula": "Verified from pinned game formula",
+      "direct-in-game": "Direct in-game observation",
+      "unamplified-planner": "Unamplified planner observation",
+      "formula-derived": "Pinned formula derived from observed shared multiplier"
+    };
+    for (const [index, attribute] of definition.attributes.entries()) {
+      const calculation = evaluation?.attributes[index];
+      addText(nodeDetailsEvidence, "h4", "", `${attribute.name} [${attribute.id}/${attribute.param}]`);
+      const native = calculation?.unconditional;
+      const amplified = calculation?.amplification;
+      addText(nodeDetailsEvidence, "p", "", `Native ${native ?? "unresolved"} · Effective base ${amplified?.effectiveBase ?? native ?? "unresolved"}${amplified ? ` · Glyph +${amplified.baseAmplificationDelta} · Effective total ${amplified.effectiveAmount}` : ""}`);
+      if (native == null && attribute.verifiedBonus != null) {
+        addText(nodeDetailsEvidence, "p", "", `Verified bonus in the node definition ${attribute.verifiedBonus}`);
+      }
+      if (calculation?.provenance) addText(nodeDetailsEvidence, "p", "", provenance[calculation.provenance] ?? calculation.provenance);
+      if (attribute.formulaReference) {
+        addText(nodeDetailsEvidence, "p", "", `Formula ${attribute.formulaReference} · Constant ${attribute.formulaValue ?? "unresolved"}`);
+      }
+      if (attribute.literalFormula != null && attribute.literalFormula !== "") {
+        addText(nodeDetailsEvidence, "p", "", `Node literal ${attribute.literalFormula}. Effective amounts come from the calculator.`);
+      }
+      if (calculation?.conditionalAmplificationStatus) {
+        addText(nodeDetailsEvidence, "p", "", "Conditional amplification unresolved. Uses the native threshold bonus.");
+      }
+    }
+    if (definition.thresholdReferences.length) {
+      addText(nodeDetailsEvidence, "h4", "", "Threshold selectors");
+      addText(nodeDetailsEvidence, "p", "", node.instanceId
+        ? "Connected thresholds use this board’s placement and total character attributes."
+        : `Inspector equip index ${BOARD_CONFIGS[boardKey].boardEquipIndex} uses the available observations.`);
+      for (const reference of definition.thresholdReferences) {
+        const threshold = evaluation?.thresholds.find(record => record.thresholdReference === reference.name);
+        const state = threshold?.resolved ? threshold.satisfied ? "Met" : "Unmet" : threshold?.reason ?? "Unresolved or unevaluated";
+        addText(nodeDetailsEvidence, "p", "", `${reference.name} · ${state}`);
+        for (const requirement of threshold?.requirements ?? (threshold ? [threshold] : [])) {
+          if (requirement.requiredValue != null && requirement.currentValue != null) {
+            addText(nodeDetailsEvidence, "p", "", `${requirement.requiredAttribute} ${requirement.currentValue} / ${requirement.requiredValue}`);
+          }
+          if (requirement.formula) addText(nodeDetailsEvidence, "p", "", requirement.formula);
+        }
+      }
+    }
+    if (definition.passivePower) {
+      addText(nodeDetailsEvidence, "h4", "", `${definition.passivePower.name} · Power SNO ${definition.passivePower.snoId}`);
+    }
+    for (const effect of legendaryEffects) {
+      addText(nodeDetailsEvidence, "p", "", `${effect.formula} · ${effect.evidence}`);
+    }
+    for (const assumption of legendaryEffects[0]?.assumptions ?? []) addText(nodeDetailsEvidence, "p", "", assumption);
+
+    const contribution = currentCalculation?.effectiveNodeContributions?.filter(line =>
+      line.instanceId === instanceId && line.sourceIndex === sourceIndex);
+    nodeDetailsRecords.textContent = JSON.stringify({
+      sourceRevision: EXPECTED_SOURCE_COMMIT, definition, evaluation, contribution, legendaryEffects,
+      glyphPrimary: primary.filter(record => record.socketSourceIndex === sourceIndex),
+      ...(definition.hasSocket && { glyphEffects: getSocketEffects(currentCalculation, instanceId, sourceIndex) })
+    }, null, 2);
+  }
+
+  function openNodeDetails(node = lastTooltipNode) {
+    if (nodeDetails.open || !boardNodes.size) return;
+    const options = [];
+    const groups = new Map();
+    nodeDetailsIds = [];
+    for (const [id, candidate] of boardNodes) {
+      const key = candidate.boardId ?? currentBoardKey;
+      if (!groups.has(key)) {
+        const group = document.createElement("optgroup");
+        group.label = BOARD_CONFIGS[key].label;
+        groups.set(key, group);
+        options.push(group);
+      }
+      const option = addText(groups.get(key), "option", "", `${nodeTitle(candidate)} · Cell ${candidate.sourceIndex ?? id}`);
+      option.value = String(nodeDetailsIds.length);
+      nodeDetailsIds.push(id);
+    }
+    nodeDetailsSelect.replaceChildren(...options);
+    const selected = node?.boardKey === currentBoardKey ? nodeDetailsIds.indexOf(node.id) : -1;
+    nodeDetailsSelect.selectedIndex = Math.max(0, selected);
+    renderNodeDetails();
+    showBoardDialog(nodeDetails, 380);
+  }
+
+  function visibleStageBounds() {
+    const bounds = stage.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft ?? 0;
+    const top = viewport?.offsetTop ?? 0;
+    return {
+      left: Math.max(left, bounds.left),
+      top: Math.max(top, bounds.top),
+      right: Math.min(left + (viewport?.width ?? document.documentElement.clientWidth), bounds.right),
+      bottom: Math.min(top + (viewport?.height ?? document.documentElement.clientHeight), bounds.bottom)
+    };
   }
 
   function positionTooltip(marker) {
-    const markerRect = marker.getBoundingClientRect();
-    const stageRect = stage.getBoundingClientRect();
-    const tooltipRect = tooltip.getBoundingClientRect();
+    if (marker !== activeTooltipNode?.marker) return;
+    const anchor = marker.getBoundingClientRect();
+    const stageBounds = stage.getBoundingClientRect();
+    const visible = visibleStageBounds();
     const margin = 10;
     const topMargin = Number.parseFloat(getComputedStyle(stage).getPropertyValue("--tooltip-top-margin"));
-    let left = markerRect.left - stageRect.left + markerRect.width / 2 - tooltipRect.width / 2;
-    let top = markerRect.top - stageRect.top - tooltipRect.height - margin;
-
-    left = Math.max(margin, Math.min(left, stage.clientWidth - tooltipRect.width - margin));
-    if (top < topMargin) top = markerRect.bottom - stageRect.top + margin;
-    top = Math.max(topMargin, Math.min(top, stage.clientHeight - tooltipRect.height - margin));
-    tooltip.style.left = `${left}px`;
-    tooltip.style.top = `${top}px`;
+    const left = visible.left + margin;
+    const right = visible.right - margin;
+    const top = Math.max(visible.top + margin, stageBounds.top + topMargin);
+    const bottom = visible.bottom - margin;
+    const anchorVisible = anchor.right > visible.left && anchor.left < visible.right
+      && anchor.bottom > visible.top && anchor.top < visible.bottom;
+    tooltip.style.visibility = anchorVisible && bottom > top ? "" : "hidden";
+    if (!anchorVisible || bottom <= top) return;
+    tooltip.style.maxWidth = `${Math.max(0, Math.min(330, right - left))}px`;
+    tooltip.style.maxHeight = `${bottom - top}px`;
+    const { width, height } = tooltip.getBoundingClientRect();
+    const clamp = (value, min, max) => Math.max(min, Math.min(value, max));
+    const xCenter = (anchor.left + anchor.right - width) / 2;
+    const yCenter = (anchor.top + anchor.bottom - height) / 2;
+    const candidates = [
+      { x: anchor.right + margin, y: clamp(yCenter, top, bottom - height) },
+      { x: anchor.left - width - margin, y: clamp(yCenter, top, bottom - height) },
+      { x: clamp(xCenter, left, right - width), y: anchor.top - height - margin },
+      { x: clamp(xCenter, left, right - width), y: anchor.bottom + margin }
+    ];
+    const stats = totalStats.getBoundingClientRect();
+    const fits = ({ x, y }) => x >= left && x + width <= right && y >= top && y + height <= bottom;
+    const clearsStats = ({ x, y }) => x + width <= stats.left || x >= stats.right || y + height <= stats.top || y >= stats.bottom;
+    const preferred = candidates.find(candidate => fits(candidate) && clearsStats(candidate))
+      ?? candidates.find(fits)
+      ?? { x: clamp(xCenter, left, right - width), y: clamp(anchor.top - height - margin, top, bottom - height) };
+    tooltip.style.left = `${preferred.x - stageBounds.left}px`;
+    tooltip.style.top = `${preferred.y - stageBounds.top}px`;
   }
 
   function showTooltip(node) {
-    const marker = node.marker;
-    activeTooltipMarker = marker;
-    buildTooltip(node);
+    if (activeTooltipNode !== node) activeTooltipNode?.marker.removeAttribute("aria-describedby");
+    activeTooltipNode = node;
+    lastTooltipNode = { id: node.id, boardKey: currentBoardKey };
+    renderPlayerTooltip(tooltip, node, getNodeTooltipRecords(node));
     tooltip.hidden = false;
     tooltip.setAttribute("aria-hidden", "false");
-    requestAnimationFrame(() => positionTooltip(marker));
+    node.marker.setAttribute("aria-describedby", tooltip.id);
+    requestAnimationFrame(() => positionTooltip(node.marker));
   }
 
   function hideTooltip(marker) {
-    if (marker && activeTooltipMarker !== marker) return;
-    activeTooltipMarker = null;
+    if (marker && activeTooltipNode?.marker !== marker) return;
+    activeTooltipNode?.marker.removeAttribute("aria-describedby");
+    activeTooltipNode = null;
     tooltip.hidden = true;
     tooltip.setAttribute("aria-hidden", "true");
   }
@@ -783,11 +872,9 @@ import {
       connectedHeaders.style.setProperty("--connected-header-scale", fit);
       connectedHeaders.style.setProperty("--gate-control-scale", Math.min(1 / zoom, (CELL_SIZE - 4) / 36));
     }
-    if (activeTooltipMarker) {
-      requestAnimationFrame(() => {
-        if (activeTooltipMarker) positionTooltip(activeTooltipMarker);
-      });
-    }
+    if (activeTooltipNode) requestAnimationFrame(() => {
+      if (activeTooltipNode) positionTooltip(activeTooltipNode.marker);
+    });
   }
 
   function setZoom(nextZoom) {
@@ -1151,14 +1238,7 @@ import {
   }
 
   function positionBoardDialog(dialog) {
-    const bounds = stage.getBoundingClientRect();
-    const visible = window.visualViewport;
-    const visibleLeft = visible?.offsetLeft ?? 0;
-    const visibleTop = visible?.offsetTop ?? 0;
-    const left = Math.max(visibleLeft, bounds.left);
-    const top = Math.max(visibleTop, bounds.top);
-    const right = Math.min(visibleLeft + (visible?.width ?? document.documentElement.clientWidth), bounds.right);
-    const bottom = Math.min(visibleTop + (visible?.height ?? document.documentElement.clientHeight), bounds.bottom);
+    const { left, top, right, bottom } = visibleStageBounds();
     const height = Math.max(0, bottom - top);
     Object.assign(dialog.style, {
       left: `${left}px`,
@@ -1391,13 +1471,11 @@ import {
     if (instanceId) marker.dataset.boardInstanceId = instanceId;
     if (node.gateDirection) marker.dataset.gateDirection = node.gateDirection;
     marker.setAttribute("role", "button");
-    marker.setAttribute("aria-describedby", tooltip.id);
     if (definition.hasSocket) marker.setAttribute("aria-haspopup", "dialog");
     else marker.setAttribute("aria-pressed", "false");
-    marker.setAttribute("aria-keyshortcuts", "Enter Space Delete");
+    marker.setAttribute("aria-keyshortcuts", "Enter Space Delete I");
     marker.tabIndex = 0;
     node.marker = marker;
-    cell.setAttribute("aria-label", definition.name);
     const activate = definition.hasSocket ? () => openGlyphPicker(node) : () => allocateNode(id);
     marker.addEventListener("click", event => {
       event.stopPropagation();
@@ -1409,6 +1487,11 @@ import {
       refundNode(id);
     });
     marker.addEventListener("keydown", event => {
+      if (event.key.toLowerCase() === "i" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        openNodeDetails({ id, boardKey: currentBoardKey });
+        return;
+      }
       if (event.key !== "Enter" && event.key !== " " && event.key !== "Delete") return;
       event.preventDefault();
       event.stopPropagation();
@@ -1849,9 +1932,6 @@ import {
         continue;
       }
       node.marker.setAttribute("aria-pressed", String(isAllocated));
-      const state = isAllocated ? "allocated" : isEligible ? "eligible to allocate" : "not connected to the allocated path";
-      const boardLabel = node.boardId ? `${BOARD_CONFIGS[node.boardId].label}, ` : "";
-      node.marker.setAttribute("aria-label", `${boardLabel}${node.definition.name}, ${KIND_LABELS[node.definition.kind] || "node"}, ${state}`);
     }
 
     pointsSpent.textContent = String(spent);
@@ -1872,6 +1952,16 @@ import {
         { boardEquipIndex: currentBoardConfig.boardEquipIndex, instanceId: currentBoardKey, glyph: inspectorGlyphs.get(currentBoardKey), legendaryScenario }
       );
     currentCalculation = result;
+    nodeEvaluations = new Map(result.nodeEvaluations.map(node => [node.nodeId ?? node.nodeIndex, node]));
+    nodeDetailsButton.disabled = boardNodes.size === 0;
+    for (const [id, node] of boardNodes) {
+      if (node.definition.hasSocket) continue;
+      const title = nodeTitle(node);
+      const state = node.definition.isGate && allocationRootId === null ? "available as local entry"
+        : socketAllocationState(id, node.marker.classList.contains("node--eligible"));
+      const boardLabel = node.boardId ? `${BOARD_CONFIGS[node.boardId].label}, ` : "";
+      node.marker.setAttribute("aria-label", `${boardLabel}${title}, ${KIND_LABELS[node.definition.kind] || "node"}, ${state}`);
+    }
     const attributes = result.verifiedParagonBonuses.coreAttributes;
     strengthTotal.textContent = `+${formatAmplifiedCore(attributes.Strength)}`;
     intelligenceTotal.textContent = `+${formatAmplifiedCore(attributes.Intelligence)}`;
@@ -1930,11 +2020,8 @@ import {
     }
     renderTotalStats(result);
 
-    if (activeTooltipMarker) {
-      const { boardInstanceId, nodeIndex } = activeTooltipMarker.dataset;
-      const node = boardNodes.get(boardInstanceId ? `${boardInstanceId}:${nodeIndex}` : Number(nodeIndex));
-      if (node) showTooltip(node);
-    }
+    if (activeTooltipNode) showTooltip(activeTooltipNode);
+    if (nodeDetails.open) renderNodeDetails();
   }
 
   function describeSocketDelta(line, precise = false) {
@@ -2116,7 +2203,7 @@ import {
       allocatedNodeIds.add(id);
       updateAllocationDisplay();
       if (saveAllocation()) {
-        setAllocationMessage(`Selected ${node.definition.name} as this board's local entry anchor. Boards remain unattached.`);
+        setAllocationMessage(`Selected ${nodeTitle(node)} as this board's local entry anchor. Boards remain unattached.`);
       }
       return;
     }
@@ -2126,7 +2213,7 @@ import {
     }
     allocatedNodeIds.add(id);
     updateAllocationDisplay();
-    if (saveAllocation()) setAllocationMessage(`Allocated ${boardNodes.get(id).definition.name}.`);
+    if (saveAllocation()) setAllocationMessage(`Allocated ${nodeTitle(boardNodes.get(id))}.`);
   }
 
   function refundNode(id) {
@@ -2151,7 +2238,7 @@ import {
 
     allocatedNodeIds = remainingIds;
     updateAllocationDisplay();
-    if (saveAllocation()) setAllocationMessage(`Refunded ${boardNodes.get(id).definition.name}.`);
+    if (saveAllocation()) setAllocationMessage(`Refunded ${nodeTitle(boardNodes.get(id))}.`);
   }
 
   function resetAllocation() {
@@ -2198,7 +2285,10 @@ import {
     }
   });
   document.getElementById("board-picker-close").addEventListener("click", () => boardPicker.close());
-  const boardDialogs = [boardPicker, boardManagement, glyphDialog];
+  nodeDetailsButton.addEventListener("click", () => openNodeDetails());
+  nodeDetailsSelect.addEventListener("change", renderNodeDetails);
+  document.getElementById("node-details-close").addEventListener("click", () => nodeDetails.close());
+  const boardDialogs = [boardPicker, boardManagement, glyphDialog, nodeDetails];
   for (const dialog of boardDialogs) {
     dialog.addEventListener("click", event => {
       if (event.target === dialog) dialog.close();
@@ -2353,7 +2443,7 @@ import {
   stage.addEventListener("lostpointercapture", endDrag);
 
   function positionWorkspaceOverlays() {
-    if (activeTooltipMarker) positionTooltip(activeTooltipMarker);
+    if (activeTooltipNode) positionTooltip(activeTooltipNode.marker);
     for (const dialog of boardDialogs) if (dialog.open) positionBoardDialog(dialog);
   }
 
@@ -2437,9 +2527,7 @@ import {
     }
   });
   new ResizeObserver(positionWorkspaceOverlays).observe(stage);
-  window.addEventListener("scroll", () => {
-    for (const dialog of boardDialogs) if (dialog.open) positionBoardDialog(dialog);
-  });
+  window.addEventListener("scroll", positionWorkspaceOverlays);
   window.visualViewport?.addEventListener("resize", positionWorkspaceOverlays);
   window.visualViewport?.addEventListener("scroll", positionWorkspaceOverlays);
 

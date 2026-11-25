@@ -24,7 +24,7 @@ async function until(check) {
   throw new Error("Timed out waiting for the browser.");
 }
 
-test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to run the browser checks", timeout: 90000 }, async t => {
+test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to run the browser checks", timeout: 120000 }, async t => {
   const profile = await mkdtemp(join(tmpdir(), "d4-planner-"));
   const contentTypes = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json" };
   let missing;
@@ -909,6 +909,19 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
         if (mobile) await evaluate(`check(q('#node-tooltip').getBoundingClientRect().top > q('.zoom-controls').getBoundingClientRect().bottom,
           'Amplified node tooltip clears the mobile zoom buttons')`);
         await screenshot(`glyph-amplification-${viewport}-${rarity}-node`);
+        if (!mobile && rarity === "rare") {
+          await evaluate(`check(q('#node-tooltip h2').textContent === 'Constrict' &&
+            qa('#node-tooltip .node-card-bonus').map(line => line.textContent).includes('+187.5 Thorns · Effective base'),
+            'Amplified Rare base excludes its separate native conditional');
+            check(q('#node-tooltip').textContent.includes('Native +150 · Glyph amplification +37.5'), 'Rare shows the native amount and glyph delta');`);
+          await screenshot("stage-2-amplified-rare");
+        }
+        if (!mobile && rarity === "normal") {
+          await evaluate(`tip(${socketNode}); check(q('#node-tooltip h2').textContent === 'Challenger' &&
+            q('#node-tooltip').textContent.includes('Level 31 · Radius 4'), 'Socket shows the localized glyph and progression');`);
+          await painted();
+          await screenshot("stage-2-assigned-socket");
+        }
         await evaluate(`(() => {
           const detail = tip(${socketNode});
           check(detail.includes('${heading}') && detail.includes('${attribute}'), 'Socket tooltip shows magnitude, target and aggregate');
@@ -992,6 +1005,12 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
         check(q('#legendary-scenario-fortified').closest('label').hidden,
           'Scenario displays inputs for the equipped Legendary boards');
       `);
+      if (!mobile) {
+        await evaluate(`center(); tip(gate('board01',320));
+          check(q('#node-tooltip').textContent.includes('Missing scenario inputs · Armor Damage Reduction') &&
+            q('#node-tooltip').textContent.includes('Needs scenario input'), 'Missing input is identified in the player tooltip');`);
+        await screenshot("stage-2-legendary-missing");
+      }
       const setInput = (key, value) => evaluate(`
         q('#legendary-scenario-${key}').value = '${value}';
         q('#legendary-scenario-${key}').dispatchEvent(new Event('input', {bubbles:true}));
@@ -1007,15 +1026,23 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
           'Scenario changes neither saves nor ordinary Total Stats');
         const panel = q('#legendary-scenario');
         check(panel.scrollWidth <= panel.clientWidth + 1, 'Scenario controls fit the viewport');
-        panel.scrollIntoView({block:'start'});
       `);
+      if (!mobile) {
+        await evaluate(`center(); const text = tip(gate('board01',320));
+          check(text.includes('Armor Damage Reduction 30.66%') && text.includes('Current bonus · 38.3%[x]') &&
+            text.includes('Eligible in scenario'), 'Allocated Castle shows input, magnitude and scenario eligibility');`);
+        await screenshot("stage-2-legendary-known");
+      }
+      await evaluate("q('#legendary-scenario').scrollIntoView({block:'start'})");
       await screenshot(`legendary-board-${mobile ? "mobile" : "desktop"}`);
       await evaluate(`
         gate('board02',198).click();
-        check(shieldEffect().includes('Allocated · Granted') && shieldEffect().includes('Current bonus · 27.1%[x]'),
+        check(shieldEffect().includes('Allocated · Granted') && shieldEffect().includes('Current bonus · 27.1%[x]')
+          && q('#allocation-message').textContent === 'Allocated Shield Bearer.',
           'Allocating grants the Shield Bearer component');
         gate('board02',198).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
-        check(shieldEffect().includes('Unallocated preview') && !shieldEffect().includes('Current bonus'),
+        check(shieldEffect().includes('Unallocated preview') && !shieldEffect().includes('Current bonus')
+          && q('#allocation-message').textContent === 'Refunded Shield Bearer.',
           'Refunding returns the component to preview');
         q('#legendary-scenario button').click();
         check(castleEffect().includes('Indeterminate'), 'Clearing inputs restores unknown state');
@@ -1170,6 +1197,13 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
       check(gate('board00',283).matches('.node--stat-highlight'), 'Total Stats focus highlights the contributor');
       check(tip(gate('board00',283)).includes('+5 Strength') && !q('#node-tooltip').hidden, 'Node tooltip works in fullscreen');
     `);
+    await paintWorkspace();
+    await evaluate(`{
+      const stage = q('#board-stage').getBoundingClientRect();
+      const tooltip = q('#node-tooltip').getBoundingClientRect();
+      check(tooltip.top >= stage.top && tooltip.right <= stage.right && tooltip.bottom <= stage.bottom
+        && getComputedStyle(q('#node-tooltip')).pointerEvents === 'none', 'Native fullscreen tooltip fits and lets input pass through');
+    }`);
     await click("gate('board00',283)", "right");
     await evaluate("check(points() === 0 && q('#allocation-message').textContent.includes('Refunded'), 'Right-click refunds in fullscreen')");
     await click("attach('board00',10)");
@@ -1271,6 +1305,197 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
     await tap(fullscreenControl);
     await until(() => evaluate(`!(${fallbackFullscreen}) && ${exitFocused}`));
     assert.equal(await evaluate("raw()"), saved);
+  });
+
+  await t.test("player tooltips, threshold states, friendly feedback, and persistent diagnostics", async () => {
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await evaluate(`
+      const draft = save();
+      draft.boards[0].allocatedSourceIndices = [304, 283, 284, 285, 264];
+      localStorage.setItem(${JSON.stringify(v2)}, JSON.stringify(draft));
+      localStorage.removeItem(${JSON.stringify(externalKey)});
+    `);
+    await reload();
+    const tooltip = "q('#node-tooltip')";
+    const normal = "gate('board00',303)";
+    const magic = "gate('board00',242)";
+    const brawn = "gate('board00',243)";
+    const knight = "gate('board01',57)";
+    async function showCard(node, title, rarity) {
+      await evaluate(`
+        tip(${node});
+        check(${tooltip}.querySelector('h2').textContent === ${JSON.stringify(title)} &&
+          ${tooltip}.dataset.rarity === '${rarity}', 'Shows the friendly heading and rarity');
+        check(!/(Generic_|Barbarian_Rare_|Paladin_Rare_|SNO|_Core)/.test(${tooltip}.textContent), 'Technical identifiers stay out of the player tooltip');
+      `);
+      await paintWorkspace();
+    }
+    await showCard("gate('board00',304)", "Starting Node", "start");
+    await evaluate(`check(${tooltip}.textContent.includes('Costs 0 points') && !${tooltip}.querySelector('.node-card-bonuses'),
+      'The starting node explains its role without an empty attributes section');`);
+    await showCard("gate('board00',10)", "North Gate", "gate");
+    await evaluate(`check(${tooltip}.textContent.includes('connects two equipped boards') &&
+      qa('#node-tooltip .node-card-bonus').length === 4, 'Connected gate explains its role and shows the four verified gains');`);
+    await showCard(normal, "Strength", "normal");
+    await evaluate(`check(${tooltip}.textContent.includes('+5 Strength') && ${tooltip}.textContent.includes('Available to allocate'),
+      'Normal node shows its own bonus and availability');`);
+    await screenshot("stage-2-normal");
+    await click(normal);
+    await evaluate("check(q('#allocation-message').textContent === 'Allocated Strength.', 'Ordinary allocation uses the friendly name')");
+    await key("Delete", "Delete", 46);
+    await evaluate("check(q('#allocation-message').textContent === 'Refunded Strength.', 'Keyboard refund uses the same friendly name')");
+    await showCard(magic, "Maximum Life", "magic");
+    await evaluate(`check(${tooltip}.textContent.includes('+2% Maximum Life') &&
+      getComputedStyle(${tooltip}.querySelector('h2')).color !== 'rgb(217, 217, 209)', 'Magic shows percentage units and the blue heading');`);
+    await screenshot("stage-2-magic");
+
+    await showCard(brawn, "Brawn", "rare");
+    await click(brawn);
+    await evaluate(`
+      check(q('#allocation-message').textContent === 'Allocated Brawn.', 'Rare feedback uses the localized name');
+      check(qa('#node-tooltip .node-card-bonuses li').length === 2 &&
+        q('#node-tooltip .is-unmet progress').max === 630 && ${tooltip}.textContent.includes('Conditional bonus is inactive.'),
+        'The single unmet requirement and both native base lines are visible');
+    `);
+    await paintWorkspace();
+    await screenshot("stage-2-rare-unmet");
+    await evaluate(`
+      window.setTooltipAttribute = (name, amount) => {
+        const input = q('#external-' + name);
+        input.value = amount;
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      setTooltipAttribute('strength', 3000);
+      check(${tooltip}.textContent.includes('Conditional bonus is active.') &&
+        q('#node-tooltip .is-met progress').value === 630, 'An allocated Rare updates to granted and caps the progress bar');
+    `);
+    await paintWorkspace();
+    await screenshot("stage-2-rare-met");
+    await click(brawn, "right");
+    await showCard(brawn, "Brawn", "rare");
+    await evaluate(`
+      check(q('#allocation-message').textContent === 'Refunded Brawn.' && ${tooltip}.textContent.includes('Allocate this node to gain the bonus.') &&
+        !${tooltip}.textContent.includes('Conditional bonus is active.'), 'A satisfied requirement on a refunded node remains a preview');
+    `);
+    await showCard(knight, "Knight", "rare");
+    await evaluate(`
+      const requirements = qa('#node-tooltip .node-card-requirements li');
+      check(requirements.length === 2 && requirements[0].classList.contains('is-met') &&
+        requirements[1].classList.contains('is-unmet') && requirements[0].textContent.includes('Strength') &&
+        requirements[1].textContent.includes('Willpower'), 'Knight presents independent AND requirements');
+    `);
+    await screenshot("stage-2-rare-dual");
+    const snapshot = await evaluate("JSON.stringify([Object.entries(localStorage), q('#total-stats').textContent, q('.advanced-details').textContent])");
+    await evaluate(`${knight}.focus({preventScroll:true})`);
+    await key("i", "KeyI", 73);
+    await until(() => evaluate("q('#node-details').matches(':modal') && document.activeElement === q('#node-details-select')"));
+    await evaluate(`
+      const evidence = q('#node-details-evidence').textContent;
+      const records = JSON.parse(q('#node-details-records').textContent);
+      check(evidence.includes('Paladin_Rare_010') && evidence.includes('2449723') && evidence.includes('Threshold selectors') &&
+        records.evaluation.attributes.some(line => line.threshold?.requirements?.length === 2)
+        && records.definition.attributes.every(line => Number.isInteger(line.id)), 'Diagnostics preserve identity, attribute IDs and exact threshold records');
+    `);
+    await screenshot("stage-2-technical-details");
+    await key("Escape", "Escape", 27);
+    await until(() => evaluate(`!q('#node-details').open && document.activeElement === ${knight}`));
+    await click("q('#node-details-open')");
+    await evaluate(`
+      const select = q('#node-details-select');
+      select.value = [...select.options].find(option => option.textContent === 'Strength · Cell 283').value;
+      select.dispatchEvent(new Event('change'));
+      check(q('#node-details-evidence').textContent.includes('ParagonNodeCoreStat_Normal'), 'Persistent diagnostics can select another cell without hovering');
+      q('#node-details-close').click();
+    `);
+    assert.equal(await evaluate("JSON.stringify([Object.entries(localStorage), q('#total-stats').textContent, q('.advanced-details').textContent])"), snapshot);
+
+    await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 740, deviceScaleFactor: 1, mobile: true });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    await evaluate("center(); q('#zoom-reset').click()");
+    await showCard(brawn, "Brawn", "rare");
+    await evaluate(`{
+      const bounds = ${tooltip}.getBoundingClientRect();
+      check(bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight &&
+        ${tooltip}.scrollHeight <= ${tooltip}.clientHeight + 1, 'Mobile tooltip fits without clipping its text');
+    }`);
+    await screenshot("stage-2-mobile");
+    await evaluate("window.scrollTo(0, 0); q('#board-workspace').requestFullscreen = undefined");
+    await tap(fullscreenControl);
+    await until(() => evaluate(fallbackFullscreen));
+    await tap("q('#zoom-reset')");
+    const drag = await evaluate(`{
+      const stage = q('#board-stage').getBoundingClientRect();
+      const marker = ${brawn}.getBoundingClientRect();
+      const start = {x: 18, y: stage.top + 70};
+      const target = {x: start.x + stage.right - 8 - (marker.left + marker.right) / 2, y: start.y};
+      ({start, target});
+    }`);
+    await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [drag.start] });
+    await send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [drag.target] });
+    await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await showCard(brawn, "Brawn", "rare");
+    await evaluate(`{
+      const stage = q('#board-stage').getBoundingClientRect(), card = ${tooltip}.getBoundingClientRect();
+      const marker = ${brawn}.getBoundingClientRect();
+      check(marker.right > stage.right - 15 && card.right <= stage.right - 9 && card.bottom <= stage.bottom &&
+        card.top > q('.zoom-controls').getBoundingClientRect().bottom, 'Panned edge tooltip stays clear of the workspace boundary and toolbar');
+    }`);
+    await screenshot("stage-2-fullscreen-edge");
+    await tap("q('#node-details-open')");
+    await until(() => evaluate("q('#node-details').matches(':modal')"));
+    await key("Escape", "Escape", 27);
+    await until(() => evaluate(`!q('#node-details').open && ${fallbackFullscreen}`));
+    await key("Escape", "Escape", 27);
+    await until(() => evaluate(`!(${fallbackFullscreen}) && ${exitFocused}`));
+  });
+
+  await t.test("all nine Legendary board descriptions and scenario components in the inspector", async () => {
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await send("Page.navigate", { url: base + "?inspect=1#connected" });
+    await ready();
+    await evaluate("q('#connected-mode-toggle').click()");
+    for (const [number, index, name, description, components] of [
+      [1, 320, "Castle", "125% of the Damage Reduction", 1],
+      [2, 198, "Shield Bearer", "110% of total character Block Chance", 1],
+      [3, 216, "Fervent", "Each active Fervor stack", 2],
+      [4, 325, "Preacher", "65% of qualifying Bonus Attack Speed", 2],
+      [5, 80, "Divinity", "Arbiter form against Vulnerable enemies", 1],
+      [6, 136, "Relentless", "2 seconds after stopping", 2],
+      [7, 260, "Sentencing", "Enemies you Judge", 1],
+      [8, 374, "Endure", "while Fortified", 1],
+      [9, 283, "Beacon", "within one of your Auras", 1]
+    ]) {
+      await evaluate(`{
+        const selector = q('#board-selector');
+        selector.value = 'board0${number}'; selector.dispatchEvent(new Event('change'));
+        const text = tip(q('.node[data-node-index="${index}"]'));
+        check(q('#node-tooltip h2').textContent === '${name}' && q('#node-tooltip').dataset.rarity === 'legendary'
+          && text.includes('${description}') && text.includes('Unallocated preview') && !text.includes('Current bonus'),
+          'Inspector shows the calibrated player description without granting the effect');
+        check(qa('#node-tooltip .node-card-effects li').length === ${components}, 'Each power component has a separate line');
+      }`);
+      if (number === 1) {
+        await evaluate(`{
+          const rotation = q('#board-rotation');
+          rotation.value = '90'; rotation.dispatchEvent(new Event('change'));
+          const text = tip(q('.node[data-node-index="10"]'));
+          check(q('#node-tooltip h2').textContent === 'East Gate' && text.includes('Available as local entry'),
+            'Inspector gate follows its displayed direction and local anchor availability');
+        }`);
+      }
+      if (number === 4) {
+        await evaluate(`
+          const input = q('#legendary-scenario-bonusAttackSpeed');
+          check(q('#node-tooltip').textContent.includes('Missing scenario inputs · Qualifying Bonus Attack Speed'), 'Preacher identifies missing input');
+          input.value = '40'; input.dispatchEvent(new Event('input', {bubbles:true}));
+          check(q('#node-tooltip').textContent.includes('Qualifying Bonus Attack Speed 40%')
+            && q('#node-tooltip').textContent.includes('Potential · 26%') && q('#node-tooltip').textContent.includes('15%[+]'),
+            'Preacher shows the known conversion and independent Zealot component');
+        `);
+      }
+    }
   });
   assert.deepEqual(errors, []);
 });

@@ -36,12 +36,27 @@ const inputLabels = names => names.map(name => LEGENDARY_SCENARIO_FIELDS[name].l
 
 export function renderLegendaryNodeTooltip(tooltip, effects) {
   const [node] = effects;
-  appendText(tooltip, "p", grantLabel(node), "tooltip-trait");
-  appendText(tooltip, "p", node.description, "tooltip-trait");
-  for (const effect of effects) appendText(tooltip, "p", describeEffect(effect), "tooltip-trait");
+  appendText(tooltip, "p", node.description, "node-card-power");
+  const list = appendText(tooltip, "ul", "", "node-card-effects");
+  for (const effect of effects) {
+    const line = describeEffect(effect);
+    const status = effect.eligibilityStatus === "satisfied"
+      ? effect.grantStatus === "granted" ? " · Eligible in scenario" : " · Eligible if allocated"
+      : "";
+    appendText(list, "li", line + status);
+  }
+  const inputs = new Map(effects.flatMap(effect => Object.entries(effect.inputs)));
+  const known = [...inputs].filter(([, value]) => value !== null).map(([key, value]) => {
+    const { label, unit } = LEGENDARY_SCENARIO_FIELDS[key];
+    const display = unit === "fraction" ? `${Number((value * 100).toFixed(8))}%`
+      : unit === "boolean" ? value ? "Yes" : "No"
+      : unit === "seconds" ? `${value} s` : value;
+    return `${label} ${display}`;
+  });
+  if (known.length) appendText(tooltip, "p", known.join(" · "), "node-card-note");
   const missing = new Set(effects.filter(effect => effect.eligibilityStatus === "unknown")
     .flatMap(effect => effect.requiredInputs.filter(key => effect.inputs[key] === null)));
-  if (missing.size) appendText(tooltip, "p", `Scenario inputs · ${inputLabels([...missing])}`, "tooltip-formula-note");
+  if (missing.size) appendText(tooltip, "p", `Missing scenario inputs · ${inputLabels([...missing])}`, "node-card-note");
 }
 
 export function createLegendaryNodePanel(details, onChange) {
