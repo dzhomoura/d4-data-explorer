@@ -7,6 +7,7 @@ import { createGlyphEmblem, createGlyphPicker, describeAdditionalEffects, descri
 import { evaluatePrimaryGlyph } from "./glyph-primary.js";
 import { evaluateAmplificationGlyph } from "./glyph-amplification.js";
 import { evaluateGlyphEffects } from "./glyph-effects.js";
+import { createLegendaryNodePanel, renderLegendaryNodeTooltip } from "./legendary-node-panel.js";
 import {
   attachBoard, calculateConnectedBonuses, CONNECTED_SAVE_KEY, CONNECTED_SAVE_KEY_V2, createStartingLayout, MAX_BOARDS,
   configureConnectedGlyph, planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, removeConnectedBoard,
@@ -440,6 +441,11 @@ import {
   let currentNodeDatabase = null;
   let externalAttributes = { Strength: 0, Intelligence: 0, Willpower: 0, Dexterity: 0 };
   let currentCalculation = null;
+  let legendaryScenario = {};
+  const legendaryNodePanel = createLegendaryNodePanel(document.querySelector(".advanced-details"), scenario => {
+    legendaryScenario = scenario;
+    updateParagonCalculation();
+  });
   let statContributors = new Map();
   let currentBoardKey = "board00";
   let currentBoardConfig = BOARD_CONFIGS.board00;
@@ -521,16 +527,18 @@ import {
     const boardKey = boardId ?? currentBoardKey;
     const config = BOARD_CONFIGS[boardKey];
     const nodeEvaluation = currentCalculation?.nodeEvaluations.find(evaluation => (evaluation.nodeId ?? evaluation.nodeIndex) === id);
+    const legendaryEffects = (currentCalculation?.legendaryNodeEffects ?? []).filter(effect =>
+      effect.instanceId === (node.instanceId ?? boardKey) && effect.sourceIndex === nodeEvaluation?.nodeIndex);
     tooltip.replaceChildren();
 
     const header = document.createElement("header");
     header.className = "tooltip-header";
-    addText(header, "h2", "tooltip-title", definition.name);
+    addText(header, "h2", "tooltip-title", legendaryEffects[0]?.nodeName ?? definition.name);
     addText(header, "span", `tooltip-kind tooltip-kind--${definition.kind}`, KIND_LABELS[definition.kind] || "Node");
     tooltip.appendChild(header);
 
     if (boardId) addText(tooltip, "p", "tooltip-meta", config.label);
-    if (nodeEvaluation?.displayName) {
+    if (!legendaryEffects.length && nodeEvaluation?.displayName) {
       addText(tooltip, "p", "tooltip-display-name", nodeEvaluation.displayName);
     }
     addText(
@@ -540,7 +548,9 @@ import {
       `SNO ${definition.snoId} · Rarity override ${definition.rarityOverride ?? "unknown"}`
     );
 
-    if (definition.attributes.length === 0) {
+    if (legendaryEffects.length) {
+      renderLegendaryNodeTooltip(tooltip, legendaryEffects);
+    } else if (definition.attributes.length === 0) {
       addText(tooltip, "p", "tooltip-empty", "No bonus attributes are defined for this node.");
     } else {
       const attributes = document.createElement("section");
@@ -679,7 +689,7 @@ import {
       tooltip.appendChild(thresholds);
     }
 
-    if (definition.passivePower) {
+    if (definition.passivePower && !legendaryEffects.length) {
       addText(tooltip, "p", "tooltip-trait", `Legendary power: ${definition.passivePower.name} (effect unresolved)`);
     }
     if (definition.hasSocket) {
@@ -1834,13 +1844,13 @@ import {
   function updateParagonCalculation() {
     if (!isConnectedMode() && (!currentBoardDefinition || !currentNodeDatabase)) return;
     const result = isConnectedMode()
-      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes, connectedGlyphs)
+      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes, connectedGlyphs, legendaryScenario)
       : calculateParagonBonuses(
         currentBoardDefinition,
         currentNodeDatabase,
         allocatedNodeIds,
         externalAttributes,
-        { boardEquipIndex: currentBoardConfig.boardEquipIndex, instanceId: currentBoardKey, glyph: inspectorGlyphs.get(currentBoardKey) }
+        { boardEquipIndex: currentBoardConfig.boardEquipIndex, instanceId: currentBoardKey, glyph: inspectorGlyphs.get(currentBoardKey), legendaryScenario }
       );
     currentCalculation = result;
     const attributes = result.verifiedParagonBonuses.coreAttributes;
@@ -1868,6 +1878,7 @@ import {
         : formatRawBonusValue(totals.conditional, category);
       displays.total.textContent = formatRawBonusValue(totals.unconditional + totals.conditional + (totals.amplification ?? 0), category);
     }
+    legendaryNodePanel.render(result.legendaryNodeEffects ?? []);
     const evaluations = [...(result.glyphEvaluations ?? []), ...(result.glyphPrimaryPreviews ?? [])];
     glyphCalculationList.replaceChildren();
     glyphCalculationDetails.hidden = evaluations.length === 0;

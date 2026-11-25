@@ -366,6 +366,13 @@ All six operation-1 glyphs use the pinned affix selector and scalar fields for b
 - Legendary records use the exact pinned scalars and provisional level-51 planner rarity. Locked and unpurchased previews are separate from applied records, and an unmet Additional requirement does not block Legendary application. Applied destinations retain their native ID, parameter and operator 7. Judicator has separate Holy and Fire entries, and generic Legendary damage retains its skill-damage destination.
 - The picker, socket tooltip and Advanced Calculation Details show the effect and eligibility states. Total Stats continues to show native and Primary numerical contributions. Additional combat behavior, Legendary stacking and the exact level-50 transaction remain unresolved. [Stage 6A evidence](research/paladin-glyph-stage-6a-evidence.md) · [Stage 6B implementation](research/paladin-glyph-stage-6b-implementation.md)
 
+### Chapter III, Stage 1B — Legendary Paragon board nodes
+
+- All nine pinned Legendary board nodes have standalone effect records. Board instance, source cell, node and power SNOs, and component identity preserve ownership across allocation, refunds, rotation and restore. Inbound class-power formula references carry provenance.
+- Castle reads resolved Armor Damage Reduction. Shield Bearer reads total character Block Chance. Preacher has a separate Zealot Attack Speed component and conversion from resolved Bonus Attack Speed. Fervent exposes separate Crit Damage and Crit Chance previews per active Fervor stack. Divinity and Relentless use the tooltip-calibrated Legendary node budget of 0.15. Sentencing, Endure and Beacon expose target- or actor-state predicates.
+- The Legendary scenario panel under Advanced Calculation Details shows relevant optional inputs. Scenario values are page-local and can represent already-resolved character statistics. The dedicated effects section and node tooltips distinguish grants, previews, known scenario outcomes and missing inputs. Ordinary totals, Rare thresholds, glyph contributions and save schemas retain their existing paths.
+- When further validation is available, measure the exact Preacher input, Fervor stacking, Relentless timing, Sentencing ownership and lifetime, Fortified-state boundaries, and Aura occupancy. A future Build Lab stat provider should supply resolved inputs once and retain each source's identity. [Stage 1A source research](research/paladin-paragon-legendary-node-research.md) · [Tooltip calibration](research/paladin-paragon-legendary-node-calibration.md) · [Stage 1B implementation](research/paladin-paragon-legendary-node-implementation.md)
+
 ## Important files
 
 - `paragon-visual/index.html`, `style.css`, `app.js` — UI, rendering, interaction, persistence.
@@ -377,6 +384,7 @@ All six operation-1 glyphs use the pinned affix selector and scalar fields for b
 - `paragon-visual/glyph-primary.js` and `tests/glyph-primary.test.mjs` — calibrated operation-2 evaluator, authored destination coverage and numerical fixtures.
 - `paragon-visual/glyph-amplification.js` and `tests/glyph-amplification.test.mjs` — operation-1 coefficients, eligible base contributions, Stage 5B diagnostics and numerical fixtures.
 - `paragon-visual/glyph-effects.js` and `tests/glyph-effects.test.mjs` — shared local requirements, typed Additional effects, Legendary previews and modifiers, and the Stage 6A tooltip fixtures.
+- `paragon-visual/legendary-board-nodes.js`, `legendary-node-panel.js` and `tests/legendary-board-nodes.test.mjs` — pinned Legendary board-node registry, scenario evaluation, presentation and fixtures.
 - `research/paladin-glyph-stage-4b-evidence.md` — independent Canny validation and qualitative player confirmations after Stage 4A.
 - `tests/paladin-glyphs.test.mjs` — catalogue identity, authored references and planner level boundaries.
 - `tests/connected-boards.test.mjs` — pinned fixture tests for branching layouts, control placement, board resets, and draft compatibility.
@@ -406,7 +414,7 @@ All six operation-1 glyphs use the pinned affix selector and scalar fields for b
 
 ## Known limitations
 
-- Glyph effects report planner eligibility and typed magnitudes. Combat dispatch, damage and DR composition, same-destination stacking, and the nine Legendary board-node powers remain unresolved.
+- Glyph and Legendary board-node effects report planner eligibility and typed magnitudes. Combat dispatch, damage and DR composition, stacking, Armor-to-DR conversion and the Legendary-node intrinsic's exact runtime binding remain unresolved.
 - The exact Legendary upgrade transaction, socket lifecycle and duplicate rules remain unresolved. The 0.033 intrinsic binding, exact game display behavior, stat-specific amplification exceptions, and Rare conditional amplification remain open.
 - Direct placement-scaling evidence is available for Knight at indices 1–3. Other source-derived placement predictions have the coverage described in Stage 2.
 - Formula-derived Castle Magic outputs are not all direct Castle tooltip observations, and power-budget intrinsic values must not be generalized beyond documented evidence.
@@ -518,8 +526,10 @@ Reviewed headless Chrome screenshots at 1440 × 1050 and emulated 390 × 740 for
 
 Chapter II, Stage 6B passed all 49 tests with headless Chrome enabled and zero skips. Fixtures reproduce all 21 Stage 6A Primary, Additional and Legendary tooltip records. Desktop and touch checks cover granted, unmet, locked, unpurchased and applied examples, restored effects, and readable typed destinations in the details panel. A separate 4,200-case Stage 5B comparison matched all native, Primary, global attribute and Rare threshold results. The focused-gate Delete failure from Stage 6A did not recur.
 
+Chapter III, Stage 1B passed all 59 tests with headless Chrome and zero skips, including desktop and mobile Legendary scenario checks. Neither historical gate-key failure recurred. A separate 1,680-case comparison matched native, Rare threshold and glyph results against the Stage 1A checkout.
+
 ## Current boundary
 
 Boards 00–09 retain their historical inspection contexts, and Boards 01–09 support local rotation. The connected planner equips up to five boards and saves their glyph selections in version 2. Direct placement-scaling evidence covers Knight at positions 1–3. Other placement predictions and the Restorative selector caveat are documented in the multi-board threshold stage.
 
-Stage 6B provides planner eligibility, sourced parameters and independent glyph modifier records. Runtime combat dispatch and stacking, conditional Rare amplification, the level-50 Legendary upgrade transaction, and the nine Legendary board-node powers remain open. [Stage 6B implementation](research/paladin-glyph-stage-6b-implementation.md)
+Stage 1B provides scenario evaluation and standalone display for all nine Legendary board effects. Runtime combat dispatch and stacking, character-stat derivation for Castle and Preacher, conditional Rare amplification, and the level-50 Legendary glyph upgrade transaction remain open. [Stage 1B implementation](research/paladin-paragon-legendary-node-implementation.md)

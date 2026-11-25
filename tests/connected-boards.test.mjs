@@ -650,3 +650,36 @@ test("connected effects retain one owner per socket and destination across lifec
   assert.deepEqual(removedResult.additionalGlyphEffects, [result.additionalGlyphEffects[0]]);
   assert.deepEqual(removedResult.legendaryGlyphModifiers, result.legendaryGlyphModifiers.slice(0, 2));
 });
+
+test("Legendary board effects follow allocation, refund, rotation, reset and save restore without changing stats", () => {
+  const { layout, allocated } = attachPlan([["board00:10", "board01", "castle"]]);
+  allocatePath(layout, allocated, "castle:320");
+  const glyphs = new Map([["castle", { snoId: 2478548, level: 51 }]]);
+  const input = { armorDamageReduction: 0.3066 };
+  const scenarioResult = calculateConnectedBonuses(layout, allocated, zero, glyphs, input);
+  const { legendaryNodeEffects: [effect], ...sameStats } = scenarioResult;
+  const { legendaryNodeEffects: [unknown], ...baseline } = calculateConnectedBonuses(layout, allocated, zero, glyphs);
+  assert.deepEqual(sameStats, baseline);
+  assert.deepEqual([effect.instanceId, effect.sourceIndex, effect.grantStatus], ["castle", 320, "granted"]);
+  assert.equal((effect.currentMagnitude * 100).toFixed(1), "38.3");
+  assert.equal(unknown.eligibilityStatus, "unknown");
+  const refunded = new Set(allocated);
+  refunded.delete("castle:320");
+  const preview = calculateConnectedBonuses(layout, refunded, zero, glyphs, input);
+  assert.deepEqual(preview.legendaryNodeEffects, [{ ...effect, grantStatus: "unallocated", currentMagnitude: null }]);
+  assert.deepEqual(preview.verifiedParagonBonuses, scenarioResult.verifiedParagonBonuses);
+  assert.deepEqual(preview.glyphEvaluations, scenarioResult.glyphEvaluations);
+  assert.deepEqual(preview.legendaryGlyphModifiers, scenarioResult.legendaryGlyphModifiers);
+  const reset = planConnectedBoardReset(layout, allocated, "castle").candidate;
+  assert.equal(calculateConnectedBonuses(layout, reset, zero, glyphs, input).legendaryNodeEffects[0].grantStatus, "unallocated");
+  const saved = writeConnectedSaveV2(layout, allocated, glyphs);
+  const restored = readConnectedSaveV2(resources, JSON.parse(JSON.stringify(saved)));
+  assert.deepEqual(calculateConnectedBonuses(restored.layout, restored.allocated, zero, restored.glyphs, input), scenarioResult);
+  assert.equal(calculateConnectedBonuses(restored.layout, restored.allocated, zero, restored.glyphs)
+    .legendaryNodeEffects[0].currentMagnitude, null);
+  const complete = reachableAllocations(layout.graph, new Set(layout.nodes.keys()), layout.root);
+  const rotated = rotateConnectedBoard(resources, layout, complete, "castle", 90);
+  assert.deepEqual(calculateConnectedBonuses(rotated, complete, zero, glyphs, input).legendaryNodeEffects, [effect]);
+  const removed = removeConnectedBoard(resources, layout, reset, "castle");
+  assert.equal(calculateConnectedBonuses(removed, reset, zero, retainConnectedGlyphs(removed, glyphs), input).legendaryNodeEffects, undefined);
+});

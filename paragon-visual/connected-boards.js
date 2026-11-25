@@ -439,7 +439,7 @@ function isPrototypeLayout({ boards }) {
     && boards[1].boardId === CASTLE_BOARD_ID && boards[1].placementIndex === 1;
 }
 
-export function calculateConnectedBonuses(layout, allocated, externalAttributes, glyphs = new Map()) {
+export function calculateConnectedBonuses(layout, allocated, externalAttributes, glyphs = new Map(), legendaryScenario) {
   validateConnectedAllocation(layout, allocated);
   const indices = new Map(layout.boards.map(({ instanceId }) => [instanceId, new Set()]));
   for (const id of allocated) {
@@ -450,7 +450,7 @@ export function calculateConnectedBonuses(layout, allocated, externalAttributes,
   const { results, coreAttributes, totalAttributes, externalAttributes: normalizedExternal } = calculateParagonBoards(
     layout.boards.map(board => ({
       board: board.board, nodeDatabase: board.database, allocatedNodeIndices: indices.get(board.instanceId),
-      calculationContext: { placementIndex: board.placementIndex, instanceId: board.instanceId, glyph: glyphs.get(board.instanceId) }
+      calculationContext: { placementIndex: board.placementIndex, instanceId: board.instanceId, glyph: glyphs.get(board.instanceId), legendaryScenario }
     })),
     externalAttributes
   );
@@ -471,6 +471,7 @@ export function calculateConnectedBonuses(layout, allocated, externalAttributes,
   const additionalGlyphEffects = results.flatMap(result => result.additionalGlyphEffects ?? []);
   const legendaryGlyphPreviews = results.flatMap(result => result.legendaryGlyphPreviews ?? []);
   const legendaryGlyphModifiers = results.flatMap(result => result.legendaryGlyphModifiers ?? []);
+  const legendaryNodeEffects = results.flatMap(result => result.legendaryNodeEffects ?? []);
   const effectiveNodeContributions = results.flatMap(result => result.effectiveNodeContributions);
   const amplifiedCore = effectiveNodeContributions.some(line => line.category === "coreAttribute" && line.baseAmplificationDelta);
   return {
@@ -482,6 +483,7 @@ export function calculateConnectedBonuses(layout, allocated, externalAttributes,
     ...(additionalGlyphEffects.length > 0 && { additionalGlyphEffects }),
     ...(legendaryGlyphPreviews.length > 0 && { legendaryGlyphPreviews }),
     ...(legendaryGlyphModifiers.length > 0 && { legendaryGlyphModifiers }),
+    ...(legendaryNodeEffects.length > 0 && { legendaryNodeEffects }),
     ...(amplifiedCore && { amplifiedThresholdEvidence: "source-derived-cross-board-model" }),
     verifiedParagonBonuses: {
       coreAttributes, rawBonuses,

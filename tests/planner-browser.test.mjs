@@ -942,5 +942,85 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
       await screenshot(`glyph-amplification-${viewport}-advanced`);
     }
   });
+  await t.test("Legendary board effects show isolated scenario previews on desktop and mobile", async () => {
+    await evaluate(`(async () => {
+      const { createStartingLayout, attachBoard, writeConnectedSaveV2 } = await import('./connected-boards.js');
+      const { mergeSharedNodeDefinitions } = await import('./shared-node-definitions.js');
+      const resources = new Map();
+      for (const suffix of ['00', '01', '02']) {
+        const board = await (await fetch('../paladin-board-' + suffix + '.json')).json();
+        const file = suffix === '00' ? 'node-data.json' : 'node-data-' + suffix + '.json';
+        const database = mergeSharedNodeDefinitions(await (await fetch(file)).json());
+        resources.set('board' + suffix, { board, database });
+      }
+      const start = createStartingLayout(resources);
+      const castle = attachBoard(resources, start, new Set([start.root]), 'board00:10', 'board01', 'castle');
+      const layout = attachBoard(resources, castle, new Set([start.root]), 'castle:230', 'board02', 'shield');
+      const parents = new Map([[layout.root, null]]);
+      const queue = [layout.root];
+      for (const id of queue) for (const neighbor of layout.graph.get(id)) if (!parents.has(neighbor)) {
+        parents.set(neighbor, id);
+        queue.push(neighbor);
+      }
+      const allocated = new Set([layout.root]);
+      for (const target of ['castle:320', 'shield:198']) {
+        check(parents.has(target), 'Legendary fixture node is reachable');
+        for (let id = target; !allocated.has(id); id = parents.get(id)) allocated.add(id);
+      }
+      allocated.delete('shield:198');
+      localStorage.setItem(${JSON.stringify(v2)}, JSON.stringify(writeConnectedSaveV2(layout, allocated)));
+    })()`);
+    for (const [width, height, mobile] of [[1440, 1050, false], [390, 740, true]]) {
+      await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
+      await send("Emulation.setTouchEmulationEnabled", { enabled: mobile });
+      await reload();
+      await evaluate(`
+        window.castleEffect = () => qa('#legendary-board-effect-list > li')[0].textContent;
+        window.shieldEffect = () => qa('#legendary-board-effect-list > li')[1].textContent;
+        check(castleEffect().includes('Allocated · Granted') && castleEffect().includes('Indeterminate'),
+          'Reload derives the allocated Castle record with unknown inputs');
+        check(shieldEffect().includes('Unallocated preview') && shieldEffect().includes('Source passive Phalanx'),
+          'Shield Bearer remains an unallocated preview');
+        const hover = tip(gate('board01',320));
+        check(q('#node-tooltip h2').textContent === 'Castle' && hover.includes('125%') && hover.includes('Indeterminate'),
+          'Legendary socket-independent tooltip shows node name, rule and status');
+        window.originalLegendarySave = raw();
+        window.originalLegendaryStats = q('#total-stats-list').textContent;
+        q('.advanced-details').open = true;
+        q('#legendary-scenario').open = true;
+        q('#legendary-scenario').scrollIntoView({block:'center'});
+        check(q('#legendary-scenario-fortified').closest('label').hidden,
+          'Scenario displays inputs for the equipped Legendary boards');
+      `);
+      const setInput = (key, value) => evaluate(`
+        q('#legendary-scenario-${key}').value = '${value}';
+        q('#legendary-scenario-${key}').dispatchEvent(new Event('input', {bubbles:true}));
+      `);
+      await setInput("armorDamageReduction", 30.66);
+      await setInput("blockChance", 24.6);
+      await evaluate(`
+        check(castleEffect().includes('Current bonus · 38.3%[x]'), 'Castle shows rounded scenario output');
+        const preview = tip(gate('board02',198));
+        check(q('#node-tooltip h2').textContent === 'Shield Bearer' && preview.includes('Potential · 27.1%[x]')
+          && !preview.includes('Current bonus'), 'Unallocated Shield Bearer presents only a potential effect');
+        check(raw() === originalLegendarySave && q('#total-stats-list').textContent === originalLegendaryStats,
+          'Scenario changes neither saves nor ordinary Total Stats');
+        const panel = q('#legendary-scenario');
+        check(panel.scrollWidth <= panel.clientWidth + 1, 'Scenario controls fit the viewport');
+        panel.scrollIntoView({block:'start'});
+      `);
+      await screenshot(`legendary-board-${mobile ? "mobile" : "desktop"}`);
+      await evaluate(`
+        gate('board02',198).click();
+        check(shieldEffect().includes('Allocated · Granted') && shieldEffect().includes('Current bonus · 27.1%[x]'),
+          'Allocating grants the Shield Bearer component');
+        gate('board02',198).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+        check(shieldEffect().includes('Unallocated preview') && !shieldEffect().includes('Current bonus'),
+          'Refunding returns the component to preview');
+        q('#legendary-scenario button').click();
+        check(castleEffect().includes('Indeterminate'), 'Clearing inputs restores unknown state');
+      `);
+    }
+  });
   assert.deepEqual(errors, []);
 });

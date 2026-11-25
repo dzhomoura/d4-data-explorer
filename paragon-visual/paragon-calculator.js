@@ -14,6 +14,7 @@ import { resolvePlacedRareThreshold } from "./paragon-thresholds.js";
 import { evaluatePrimaryGlyph } from "./glyph-primary.js";
 import { evaluateAmplificationGlyph } from "./glyph-amplification.js";
 import { evaluateGlyphEffects } from "./glyph-effects.js";
+import { evaluateLegendaryBoardNode, normalizeLegendaryScenario, resolveLegendaryBoardNode } from "./legendary-board-nodes.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -314,6 +315,8 @@ function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calcul
     throw new Error("Node database contains duplicate definitions.");
   }
 
+  const legendaryScenario = normalizeLegendaryScenario(calculationContext.legendaryScenario);
+  const legendaryNode = resolveLegendaryBoardNode(board, definitions, nodeDatabase.source.commit);
   const candidateRegistry = BOARD_BONUS_REGISTRIES[board.__snoID__] || null;
   const usesPlacement = Object.hasOwn(calculationContext, "placementIndex");
   const placementIndex = usesPlacement ? calculationContext.placementIndex : undefined;
@@ -390,7 +393,7 @@ function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calcul
     const registeredAttributes = new Map();
     registeredAttributesByNode.set(index, registeredAttributes);
 
-    if (definition.passivePower && !nodeRecord) {
+    if (definition.passivePower && !nodeRecord && index !== legendaryNode?.sourceIndex) {
       addUnresolved(
         index,
         definition,
@@ -633,6 +636,8 @@ function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calcul
       const { affixSnoId, requirements, resolved, satisfied } = effects.additionalEffect;
       amplification.additional = { affixSnoId, requirements, resolved, satisfied };
     }
+    const legendaryNodeEffects = evaluateLegendaryBoardNode(legendaryNode, instanceId,
+      allocatedNodeIndices.has(legendaryNode?.sourceIndex), legendaryScenario);
     const unresolvedBonuses = [...unresolvedByBonus.values()];
     const conditionalBonuses = nodeEvaluations.flatMap(node => (node.allocated ? node.attributes : [])
       .filter(attribute => attribute.conditional > 0)
@@ -656,6 +661,7 @@ function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calcul
       ...(effects && { additionalGlyphEffects: [effects.additionalEffect] }),
       ...(effects?.legendaryPreview && { legendaryGlyphPreviews: [effects.legendaryPreview] }),
       ...(effects?.legendaryModifiers.length && { legendaryGlyphModifiers: effects.legendaryModifiers }),
+      ...(legendaryNodeEffects.length > 0 && { legendaryNodeEffects }),
       verifiedParagonBonuses: {
         coreAttributes,
         totalCoreAttributes: Object.values(coreAttributes).reduce((sum, amount) => sum + amount, 0),

@@ -1779,3 +1779,61 @@ p.glyph-primary-result {
     grid-template-columns: 1fr;
   }
 }
+
+.legendary-scenario > summary,
+.legendary-board-effects summary {
+  cursor: pointer;
+  color: #e4d7b6;
+}
+
+.legendary-scenario-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 175px), 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.legendary-scenario-fields label {
+  min-width: 0;
+  font: 12px/1.4 Arial, sans-serif;
+}
+
+.legendary-scenario-fields input,
+.legendary-scenario-fields select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border: 1px solid #634b2d;
+  border-radius: 3px;
+  background: #181511;
+  color: #e8dfcb;
+  font: inherit;
+}
+
+#legendary-scenario-feedback {
+  color: #e58b76;
+}
+
+#legendary-board-effect-list {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+}
+
+#legendary-board-effect-list > li {
+  padding: 9px 11px;
+  border: 1px solid #493b27;
+  overflow-wrap: anywhere;
+}
+
+#legendary-board-effect-list h3,
+#legendary-board-effect-list p {
+  margin: 0 0 5px;
+}
+
+.legendary-node-effect,
+.legendary-node-status {
+  color: #efd18a;
+}
