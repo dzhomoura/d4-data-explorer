@@ -29,55 +29,19 @@
                 <option value="board09" disabled>Board 09 — Beacon</option>
               </select>
             </label>
-            <label id="board-rotation-label" class="board-selector-label" for="board-rotation" hidden>
-              Rotation
-              <select id="board-rotation" title="Clockwise board rotation">
-                <option value="0">0°</option>
-                <option value="90">90°</option>
-                <option value="180">180°</option>
-                <option value="270">270°</option>
-              </select>
-            </label>
             <button id="connected-mode-toggle" class="allocation-reset connected-mode-toggle" type="button" aria-pressed="false" disabled>Connected Boards</button>
           </div>
         </div>
       </header>
 
       <section class="board-panel" aria-label="Paragon board viewer">
-        <section class="allocation-panel" aria-labelledby="allocation-title">
-          <div class="allocation-main">
-            <div class="allocation-copy">
-              <h2 id="allocation-title">Point allocation</h2>
-              <p class="allocation-instructions">Click or tap a highlighted node to allocate it. Open a glyph socket to manage its glyph or allocate the socket. Right-click or press Delete on a focused node to refund.</p>
-              <p id="allocation-message" class="allocation-message" role="status" aria-live="polite">Starting node is active.</p>
-            </div>
-            <dl class="allocation-stats">
-              <div>
-                <dt>Points spent</dt>
-                <dd id="points-spent">0</dd>
-              </div>
-              <div>
-                <dt>Allocated nodes</dt>
-                <dd id="allocated-count">0</dd>
-              </div>
-            </dl>
-            <div class="allocation-actions">
-              <p id="save-status" class="save-status save-status--unsaved" role="status" aria-live="polite">Not saved yet</p>
-              <div class="allocation-action-buttons">
-                <button id="export-build" class="allocation-reset" type="button">Export Build</button>
-                <button id="import-build" class="allocation-reset" type="button">Import Build</button>
-                <button id="allocation-reset" class="allocation-reset" type="button">Reset Allocation</button>
-              </div>
-              <input id="build-file" type="file" accept=".json,application/json" hidden>
-            </div>
-          </div>
-          <p class="allocation-cost-note">Provisional costs: starting node 0; every other node, including gates and sockets, 1 point.</p>
-        </section>
-
-        <section class="external-attribute-panel" aria-labelledby="external-attribute-title">
+        <details class="external-attribute-panel">
+          <summary>
+            <span class="external-attribute-title">External Attributes</span>
+            <span id="external-attribute-summary" class="external-attribute-summary"></span>
+          </summary>
           <div class="external-attribute-section">
-            <h2 id="external-attribute-title">External attributes</h2>
-            <p>Enter attributes from sources outside this board. These inputs are saved locally and are not included in Paragon bonus totals or build exports.</p>
+            <p>Attributes from gear and other sources outside Paragon. These values count toward thresholds alongside Paragon gains and are stored locally, outside build exports.</p>
             <div class="external-attribute-inputs">
               <label>Strength <input id="external-strength" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
               <label>Intelligence <input id="external-intelligence" type="number" min="0" step="1" value="0" inputmode="numeric"></label>
@@ -86,101 +50,141 @@
             </div>
             <p id="external-save-status" class="external-save-status" role="status" aria-live="polite">Using default external attributes.</p>
           </div>
-        </section>
+        </details>
 
-        <div class="board-viewport">
-          <div id="board-stage" class="board-stage" tabindex="0" aria-label="Board canvas; drag to pan and use the mouse wheel to zoom">
-            <div id="connected-board-headers" class="connected-board-headers" hidden></div>
-            <div id="board-frame" class="board-frame"></div>
-            <p id="connected-board-error" class="connected-board-error" aria-hidden="true" hidden></p>
-            <div id="node-tooltip" class="node-tooltip" role="tooltip" aria-hidden="true" hidden></div>
-          </div>
-          <div class="zoom-controls" role="group" aria-label="Board zoom controls">
-            <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
-            <button id="zoom-reset" type="button" aria-label="Fit board view" title="Fit board view">Fit</button>
-            <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
-          </div>
-          <details id="total-stats" class="total-stats" open>
-            <summary>Total Stats</summary>
-            <div class="total-stats-content">
-              <p class="total-stats-note">Paragon bonuses only. Hover a bonus to highlight its allocated nodes.</p>
-              <ul id="total-stats-list" class="total-stats-list" aria-live="polite"></ul>
-              <p id="total-stats-empty" class="total-stats-empty">Allocate verified bonus nodes to see totals.</p>
-            </div>
-          </details>
-          <dialog id="board-picker" class="board-picker" aria-labelledby="board-picker-title" aria-describedby="board-picker-description">
-            <div class="board-picker-panel">
-              <header class="board-picker-header">
-                <h2 id="board-picker-title">Choose a board</h2>
-                <button id="board-picker-close" type="button" aria-label="Close board picker" title="Close board picker">×</button>
-              </header>
-              <p id="board-picker-description"></p>
-              <p id="board-picker-error" role="alert" hidden></p>
-              <ul id="board-picker-options" class="board-picker-options" aria-label="Additional Paladin boards"></ul>
-            </div>
-          </dialog>
-          <dialog id="board-management" class="board-picker" aria-labelledby="board-management-title">
-            <div class="board-picker-panel board-management-panel">
-              <header class="board-picker-header">
-                <h2 id="board-management-title"></h2>
-                <button id="board-management-close" type="button" aria-label="Close board management" autofocus>×</button>
-              </header>
-              <p id="board-management-feedback" role="status" hidden></p>
-              <div id="board-management-actions" class="board-management-actions"></div>
-            </div>
-          </dialog>
-          <dialog id="glyph-picker" class="board-picker glyph-picker" aria-labelledby="glyph-picker-title" aria-describedby="glyph-picker-note">
-            <div class="board-picker-panel glyph-picker-panel">
-              <header class="board-picker-header">
-                <h2 id="glyph-picker-title">Glyph socket</h2>
-                <button id="glyph-picker-close" type="button" aria-label="Close glyph picker" autofocus>×</button>
-              </header>
-              <p id="glyph-picker-note">Glyph bonuses are eligible when the socket is allocated. Passive combat behavior and modifier stacking remain unresolved.</p>
-              <div class="glyph-socket-actions">
-                <span id="glyph-socket-state"></span>
-                <button id="glyph-allocate-socket" type="button">Allocate socket</button>
-              </div>
-              <p id="glyph-session-note" hidden>Inspector glyph edits last until reload.</p>
-              <div class="glyph-picker-content">
-                <div class="glyph-browser">
-                  <label for="glyph-search">Search glyphs</label>
-                  <input id="glyph-search" type="search" placeholder="Glyph name" autocomplete="off">
-                  <ul id="glyph-options" aria-label="Paladin glyphs"></ul>
-                  <p id="glyph-no-matches" hidden>No matching glyphs.</p>
+        <section id="board-workspace" class="board-workspace" aria-label="Board workspace">
+          <header class="allocation-panel">
+            <div class="allocation-main">
+              <dl class="allocation-stats">
+                <div>
+                  <dt>Points spent</dt>
+                  <dd id="points-spent">0</dd>
                 </div>
-                <div class="glyph-preview">
-                  <div id="glyph-preview-heading" class="glyph-preview-heading"></div>
-                  <p id="glyph-progression" role="status"></p>
-                  <div id="glyph-bonus-descriptions" class="glyph-bonus-descriptions"></div>
-                  <label class="glyph-level" for="glyph-level">Glyph level
-                    <input id="glyph-level" type="number" inputmode="numeric" required step="1" aria-describedby="glyph-progression glyph-level-note">
-                  </label>
-                  <p id="glyph-level-note"></p>
+                <div>
+                  <dt>Allocated nodes</dt>
+                  <dd id="allocated-count">0</dd>
                 </div>
+              </dl>
+              <p id="save-status" class="save-status save-status--unsaved" role="status">Not saved yet</p>
+              <div class="allocation-actions">
+                <label id="board-rotation-label" class="board-selector-label" for="board-rotation" hidden>
+                  Rotation
+                  <select id="board-rotation" title="Clockwise board rotation">
+                    <option value="0">0°</option>
+                    <option value="90">90°</option>
+                    <option value="180">180°</option>
+                    <option value="270">270°</option>
+                  </select>
+                </label>
+                <button id="export-build" class="allocation-reset" type="button">Export Build</button>
+                <button id="import-build" class="allocation-reset" type="button">Import Build</button>
+                <button id="allocation-reset" class="allocation-reset" type="button">Reset Allocation</button>
+                <input id="build-file" type="file" accept=".json,application/json" hidden>
+                <details id="workspace-help" class="workspace-help">
+                  <summary>Help</summary>
+                  <div class="workspace-help-content">
+                    <p>Click or tap a highlighted node to allocate it. Right-click or press Delete on a focused node to refund. Paths connect orthogonally and appear red when allocated.</p>
+                    <p>Open a socket to allocate it or manage its glyph. <span id="board-picker-hint" hidden>Use + beside a free gate or open its board menu to attach another board.</span></p>
+                    <p>Provisional costs: starting node 0; every other node, including gates and sockets, 1 point.</p>
+                  </div>
+                </details>
               </div>
-              <p id="glyph-feedback" role="status" hidden></p>
-              <footer class="glyph-picker-actions">
-                <button id="glyph-remove" type="button" hidden>Remove glyph</button>
-                <button id="glyph-save" type="button">Save glyph</button>
-              </footer>
             </div>
-          </dialog>
-        </div>
-        <footer class="board-footer">
-          <div id="legend" class="legend" aria-label="Node color legend">
-            <span class="legend-item"><i class="swatch swatch--normal"></i>Normal</span>
-            <span class="legend-item"><i class="swatch swatch--magic"></i>Magic</span>
-            <span class="legend-item"><i class="swatch swatch--rare"></i>Rare</span>
-            <span class="legend-item"><i class="swatch swatch--legendary"></i>Legendary</span>
-            <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
-            <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
-            <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>
-            <label class="legend-item glyph-radius-toggle"><input id="show-glyph-radii" type="checkbox" checked> Glyph radii</label>
+            <p id="allocation-message" class="allocation-message" role="status">Starting node is active.</p>
+          </header>
+
+          <div class="board-viewport">
+            <div id="board-stage" class="board-stage" tabindex="0" aria-label="Board canvas; drag to pan and use the mouse wheel to zoom">
+              <div id="connected-board-headers" class="connected-board-headers" hidden></div>
+              <div id="board-frame" class="board-frame"></div>
+              <p id="connected-board-error" class="connected-board-error" aria-hidden="true" hidden></p>
+              <div id="node-tooltip" class="node-tooltip" role="tooltip" aria-hidden="true" hidden></div>
+            </div>
+            <div class="zoom-controls" role="group" aria-label="Board zoom controls">
+              <button id="zoom-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+              <button id="zoom-reset" type="button" aria-label="Fit board view" title="Fit board view">Fit</button>
+              <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+            </div>
+            <button id="workspace-fullscreen" type="button" aria-controls="board-workspace">Enter Fullscreen</button>
+            <details id="total-stats" class="total-stats" open>
+              <summary>Total Stats</summary>
+              <div class="total-stats-content">
+                <p class="total-stats-note">Paragon bonuses only. Hover a bonus to highlight its allocated nodes.</p>
+                <ul id="total-stats-list" class="total-stats-list" aria-live="polite"></ul>
+                <p id="total-stats-empty" class="total-stats-empty">Allocate verified bonus nodes to see totals.</p>
+              </div>
+            </details>
+            <dialog id="board-picker" class="board-picker" aria-labelledby="board-picker-title" aria-describedby="board-picker-description">
+              <div class="board-picker-panel">
+                <header class="board-picker-header">
+                  <h2 id="board-picker-title">Choose a board</h2>
+                  <button id="board-picker-close" type="button" aria-label="Close board picker" title="Close board picker">×</button>
+                </header>
+                <p id="board-picker-description"></p>
+                <p id="board-picker-error" role="alert" hidden></p>
+                <ul id="board-picker-options" class="board-picker-options" aria-label="Additional Paladin boards"></ul>
+              </div>
+            </dialog>
+            <dialog id="board-management" class="board-picker" aria-labelledby="board-management-title">
+              <div class="board-picker-panel board-management-panel">
+                <header class="board-picker-header">
+                  <h2 id="board-management-title"></h2>
+                  <button id="board-management-close" type="button" aria-label="Close board management" autofocus>×</button>
+                </header>
+                <p id="board-management-feedback" role="status" hidden></p>
+                <div id="board-management-actions" class="board-management-actions"></div>
+              </div>
+            </dialog>
+            <dialog id="glyph-picker" class="board-picker glyph-picker" aria-labelledby="glyph-picker-title" aria-describedby="glyph-picker-note">
+              <div class="board-picker-panel glyph-picker-panel">
+                <header class="board-picker-header">
+                  <h2 id="glyph-picker-title">Glyph socket</h2>
+                  <button id="glyph-picker-close" type="button" aria-label="Close glyph picker" autofocus>×</button>
+                </header>
+                <p id="glyph-picker-note">Glyph bonuses are eligible when the socket is allocated. Passive combat behavior and modifier stacking remain unresolved.</p>
+                <div class="glyph-socket-actions">
+                  <span id="glyph-socket-state"></span>
+                  <button id="glyph-allocate-socket" type="button">Allocate socket</button>
+                </div>
+                <p id="glyph-session-note" hidden>Inspector glyph edits last until reload.</p>
+                <div class="glyph-picker-content">
+                  <div class="glyph-browser">
+                    <label for="glyph-search">Search glyphs</label>
+                    <input id="glyph-search" type="search" placeholder="Glyph name" autocomplete="off">
+                    <ul id="glyph-options" aria-label="Paladin glyphs"></ul>
+                    <p id="glyph-no-matches" hidden>No matching glyphs.</p>
+                  </div>
+                  <div class="glyph-preview">
+                    <div id="glyph-preview-heading" class="glyph-preview-heading"></div>
+                    <p id="glyph-progression" role="status"></p>
+                    <div id="glyph-bonus-descriptions" class="glyph-bonus-descriptions"></div>
+                    <label class="glyph-level" for="glyph-level">Glyph level
+                      <input id="glyph-level" type="number" inputmode="numeric" required step="1" aria-describedby="glyph-progression glyph-level-note">
+                    </label>
+                    <p id="glyph-level-note"></p>
+                  </div>
+                </div>
+                <p id="glyph-feedback" role="status" hidden></p>
+                <footer class="glyph-picker-actions">
+                  <button id="glyph-remove" type="button" hidden>Remove glyph</button>
+                  <button id="glyph-save" type="button">Save glyph</button>
+                </footer>
+              </div>
+            </dialog>
           </div>
-          <p class="connection-note">Only orthogonally adjacent occupied nodes connect. Allocated paths are highlighted in red.
-            <span id="board-picker-hint" hidden>Use + beside a free gate or open its board menu to attach another board.</span>
-          </p>
-        </footer>
+          <footer class="board-footer">
+            <div id="legend" class="legend" aria-label="Node color legend">
+              <span class="legend-item"><i class="swatch swatch--normal"></i>Normal</span>
+              <span class="legend-item"><i class="swatch swatch--magic"></i>Magic</span>
+              <span class="legend-item"><i class="swatch swatch--rare"></i>Rare</span>
+              <span class="legend-item"><i class="swatch swatch--legendary"></i>Legendary</span>
+              <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
+              <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
+              <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>
+              <label class="legend-item glyph-radius-toggle"><input id="show-glyph-radii" type="checkbox" checked> Glyph radii</label>
+            </div>
+          </footer>
+        </section>
 
         <details class="advanced-details">
           <summary>Advanced Calculation Details <span>Breakdowns and diagnostics</span></summary>

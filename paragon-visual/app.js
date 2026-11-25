@@ -151,6 +151,9 @@ import {
   });
 
   const stage = document.getElementById("board-stage");
+  const workspace = document.getElementById("board-workspace");
+  const fullscreenButton = document.getElementById("workspace-fullscreen");
+  const workspaceHelp = document.getElementById("workspace-help");
   const frame = document.getElementById("board-frame");
   const status = document.getElementById("board-status");
   const boardSelector = document.getElementById("board-selector");
@@ -198,6 +201,7 @@ import {
     Dexterity: document.getElementById("total-dexterity")
   };
   const externalSaveStatus = document.getElementById("external-save-status");
+  const externalAttributeSummary = document.getElementById("external-attribute-summary");
   const rawBonusDisplays = {
     damage: {
       unconditional: document.getElementById("raw-damage-base"),
@@ -914,9 +918,11 @@ import {
   }
 
   function fitBoardView() {
+    if (!boardPixelWidth || !boardPixelHeight) return;
     const padding = isConnectedMode() ? connectedViewPadding() : null;
     zoom = fittedBoardZoom(padding);
-    if (padding) panY = (padding.top - padding.bottom) / 2;
+    panX = 0;
+    panY = padding ? (padding.top - padding.bottom) / 2 : 0;
     applyTransform();
   }
 
@@ -1102,7 +1108,7 @@ import {
       return;
     }
     setAllocationMessage(connectedLayout.boards.length < MAX_BOARDS
-      ? "Use + beside a free gate to attach a board." : "All five board positions are equipped.");
+      ? "Board workspace ready." : "All five board positions are equipped.");
   }
 
   function saveConnectedAllocation(change) {
@@ -1130,7 +1136,6 @@ import {
     connectedBoardError.hidden = true;
     renderConnectedLayout();
     if (fit) {
-      panX = panY = 0;
       fitBoardView();
     } else {
       applyTransform();
@@ -1147,10 +1152,13 @@ import {
 
   function positionBoardDialog(dialog) {
     const bounds = stage.getBoundingClientRect();
-    const left = Math.max(0, bounds.left);
-    const top = Math.max(0, bounds.top);
-    const right = Math.min(document.documentElement.clientWidth, bounds.right);
-    const bottom = Math.min(document.documentElement.clientHeight, bounds.bottom);
+    const visible = window.visualViewport;
+    const visibleLeft = visible?.offsetLeft ?? 0;
+    const visibleTop = visible?.offsetTop ?? 0;
+    const left = Math.max(visibleLeft, bounds.left);
+    const top = Math.max(visibleTop, bounds.top);
+    const right = Math.min(visibleLeft + (visible?.width ?? document.documentElement.clientWidth), bounds.right);
+    const bottom = Math.min(visibleTop + (visible?.height ?? document.documentElement.clientHeight), bounds.bottom);
     const height = Math.max(0, bottom - top);
     Object.assign(dialog.style, {
       left: `${left}px`,
@@ -1658,6 +1666,16 @@ import {
       input.value = String(externalAttributes[name]);
       input.setAttribute("aria-invalid", "false");
     }
+    renderExternalAttributeSummary();
+  }
+
+  function renderExternalAttributeSummary() {
+    externalAttributeSummary.replaceChildren();
+    const abbreviations = { Strength: "STR", Intelligence: "INT", Willpower: "WIL", Dexterity: "DEX" };
+    for (const [name, amount] of Object.entries(externalAttributes)) {
+      const value = addText(externalAttributeSummary, "span", "", `${abbreviations[name]} ${amount.toLocaleString()}`);
+      value.setAttribute("aria-label", `${name} ${amount}`);
+    }
   }
 
   function restoreExternalAttributes() {
@@ -1718,6 +1736,7 @@ import {
     }
 
     externalAttributes = nextAttributes;
+    renderExternalAttributeSummary();
     updateParagonCalculation();
     saveExternalAttributes();
   }
@@ -2299,16 +2318,7 @@ import {
 
   zoomInButton.addEventListener("click", () => setZoom(zoom + ZOOM_STEP));
   zoomOutButton.addEventListener("click", () => setZoom(zoom - ZOOM_STEP));
-  resetButton.addEventListener("click", () => {
-    panX = 0;
-    panY = 0;
-    if (isConnectedMode()) {
-      fitBoardView();
-      return;
-    }
-    zoom = Math.min(1, (stage.clientWidth - 48) / boardPixelWidth, (stage.clientHeight - 48) / boardPixelHeight);
-    applyTransform();
-  });
+  resetButton.addEventListener("click", fitBoardView);
 
   totalStats.addEventListener("toggle", () => {
     if (!totalStats.open) clearStatHighlights();
@@ -2342,16 +2352,96 @@ import {
   stage.addEventListener("pointercancel", endDrag);
   stage.addEventListener("lostpointercapture", endDrag);
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") hideTooltip();
-  });
-  window.addEventListener("resize", () => {
+  function positionWorkspaceOverlays() {
     if (activeTooltipMarker) positionTooltip(activeTooltipMarker);
     for (const dialog of boardDialogs) if (dialog.open) positionBoardDialog(dialog);
+  }
+
+  const outsideWorkspace = document.querySelectorAll(".topbar, .external-attribute-panel, .advanced-details");
+  let fallbackScroll = null;
+  let fullscreenTransition = false;
+  let wasFullscreen = false;
+  let restoreFullscreenFocus = false;
+
+  function focusFullscreenButtonAfterExit() {
+    if (!restoreFullscreenFocus || boardDialogs.some(dialog => dialog.open)) return;
+    restoreFullscreenFocus = false;
+    fullscreenButton.focus({ preventScroll: true });
+  }
+
+  function updateFullscreenState() {
+    const fullscreen = document.fullscreenElement === workspace || fallbackScroll !== null;
+    fullscreenButton.textContent = fullscreen ? "Exit Fullscreen" : "Enter Fullscreen";
+    if (fullscreen !== wasFullscreen) {
+      hideTooltip();
+      workspaceHelp.open = false;
+      for (const section of outsideWorkspace) section.inert = fullscreen;
+      restoreFullscreenFocus = !fullscreen;
+      wasFullscreen = fullscreen;
+      if (fullscreen && !workspace.contains(document.activeElement)) {
+        fullscreenButton.focus({ preventScroll: true });
+      } else {
+        focusFullscreenButtonAfterExit();
+      }
+    }
+    positionWorkspaceOverlays();
+  }
+
+  function setFallbackFullscreen(expanded) {
+    if (expanded) fallbackScroll = { left: window.scrollX, top: window.scrollY };
+    workspace.classList.toggle("board-workspace--expanded", expanded);
+    document.documentElement.classList.toggle("workspace-scroll-locked", expanded);
+    if (!expanded) {
+      window.scrollTo(fallbackScroll);
+      fallbackScroll = null;
+    }
+    updateFullscreenState();
+  }
+
+  fullscreenButton.addEventListener("click", async () => {
+    if (fullscreenTransition) return;
+    fullscreenTransition = true;
+    try {
+      if (fallbackScroll) {
+        setFallbackFullscreen(false);
+      } else if (document.fullscreenElement === workspace) {
+        await document.exitFullscreen();
+      } else {
+        if (document.fullscreenEnabled && workspace.requestFullscreen) {
+          try {
+            await workspace.requestFullscreen();
+          } catch {
+            // Browsers can reject fullscreen because of permissions or user activation.
+            setFallbackFullscreen(true);
+          }
+        } else {
+          setFallbackFullscreen(true);
+        }
+      }
+    } catch {
+      // The browser may already be leaving fullscreen.
+    } finally {
+      fullscreenTransition = false;
+      updateFullscreenState();
+    }
   });
+
+  document.addEventListener("fullscreenchange", updateFullscreenState);
+  for (const dialog of boardDialogs) dialog.addEventListener("close", focusFullscreenButtonAfterExit);
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    hideTooltip();
+    if (fallbackScroll && !event.defaultPrevented && !boardDialogs.some(dialog => dialog.open)) {
+      event.preventDefault();
+      setFallbackFullscreen(false);
+    }
+  });
+  new ResizeObserver(positionWorkspaceOverlays).observe(stage);
   window.addEventListener("scroll", () => {
     for (const dialog of boardDialogs) if (dialog.open) positionBoardDialog(dialog);
   });
+  window.visualViewport?.addEventListener("resize", positionWorkspaceOverlays);
+  window.visualViewport?.addEventListener("scroll", positionWorkspaceOverlays);
 
   async function loadBoardResource(boardKey) {
     const config = BOARD_CONFIGS[boardKey];

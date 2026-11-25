@@ -52,7 +52,9 @@ Board 03 keeps board-specific definitions for Magic Armor Percent, All Resistanc
 
 All ten boards share node rendering, tooltips, zoom/pan, orthogonal allocation/refund rules, raw-bonus display, and manual external-attribute inputs. Switching boards preserves independent allocations and rotations.
 
-External attributes remain editable and locally persisted above the board. Verified and total-threshold breakdowns, raw bonuses, unresolved diagnostics, and provenance are retained in a closed-by-default **Advanced Calculation Details** section. The detailed raw-bonus view includes flat Thorns with Base / Conditional / Total values and no percent suffix.
+External attributes remain editable and locally persisted above the board. Their disclosure starts closed and shows the four saved values. Verified and total-threshold breakdowns, raw bonuses, unresolved diagnostics, and provenance are retained in a closed-by-default **Advanced Calculation Details** section. The detailed raw-bonus view includes flat Thorns with Base / Conditional / Total values and no percent suffix.
+
+The workspace header keeps point and node counts, save status, reset, and interaction feedback together. Help contains the allocation instructions and provisional costs. Enter Fullscreen expands the same interactive board with its canvas controls, pickers, legend, and Total Stats. Chrome can use native fullscreen. When the API is unavailable or denied, the viewport-filling fallback preserves the camera and returns focus and page scroll on exit. Advanced Calculation Details and External Attributes remain in the normal page. [Chapter IV Stage 1 implementation and screenshots](research/paladin-ui-chapter-4-stage-1.md)
 
 ### Board 00
 
@@ -527,6 +529,8 @@ Reviewed headless Chrome screenshots at 1440 × 1050 and emulated 390 × 740 for
 Chapter II, Stage 6B passed all 49 tests with headless Chrome enabled and zero skips. Fixtures reproduce all 21 Stage 6A Primary, Additional and Legendary tooltip records. Desktop and touch checks cover granted, unmet, locked, unpurchased and applied examples, restored effects, and readable typed destinations in the details panel. A separate 4,200-case Stage 5B comparison matched all native, Primary, global attribute and Rare threshold results. The focused-gate Delete failure from Stage 6A did not recur.
 
 Chapter III, Stage 1B passed all 59 tests with headless Chrome and zero skips, including desktop and mobile Legendary scenario checks. Neither historical gate-key failure recurred. A separate 1,680-case comparison matched native, Rare threshold and glyph results against the Stage 1A checkout.
+
+Chapter IV, Stage 1 passed all 61 tests with headless Chrome and zero skips. The checks include real Fullscreen API entry and exit, an exit initiated outside the workspace toggle, mobile fallback, camera and Fit behavior, and board and glyph interactions with the workspace expanded. The same allocation, save, and calculation regressions passed. Physical Escape in native fullscreen, browser-level exit controls, and physical mobile browser chrome still require manual verification. [Stage 1 verification and reviewed captures](research/paladin-ui-chapter-4-stage-1.md#screenshot-review)
 
 ## Current boundary
 

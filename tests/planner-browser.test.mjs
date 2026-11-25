@@ -1022,5 +1022,255 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
       `);
     }
   });
+  const fullscreenControl = "q('#workspace-fullscreen')";
+  const nativeFullscreen = "document.fullscreenElement === q('#board-workspace')";
+  const fallbackFullscreen = "q('#board-workspace').classList.contains('board-workspace--expanded')";
+  const externalKey = "d4-paragon-paladin-00-external-attributes-v1";
+  const paintWorkspace = () => evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+  const exitFocused = `${fullscreenControl}.textContent === 'Enter Fullscreen' && document.activeElement === ${fullscreenControl}`;
+  async function checkWorkspaceLayout() {
+    await evaluate(`{
+      checkControls();
+      const stage = q('#board-stage').getBoundingClientRect();
+      const button = ${fullscreenControl}.getBoundingClientRect();
+      check(button.top - stage.top === 10 && stage.right - button.right === 10,
+        'Fullscreen control anchors at the top right');
+      const others = qa('.zoom-controls, #total-stats, .connected-board-header, .gate-attachment');
+      check(others.every(node => {
+        const rect = node.getBoundingClientRect();
+        return rect.right <= button.left || rect.left >= button.right || rect.bottom <= button.top || rect.top >= button.bottom;
+      }), 'Fullscreen control clears board and overlay controls at Fit');
+      check(document.documentElement.scrollWidth === document.documentElement.clientWidth,
+        'Workspace fits horizontally');
+    }`);
+  }
+  await t.test("desktop workspace, native fullscreen, and fullscreen board interactions", async () => {
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await reload();
+    await evaluate(`
+      window.scrollTo(0, 0);
+      window.workspaceSnapshot = () => JSON.stringify({
+        keys: Object.fromEntries(Object.keys(localStorage).sort().map(key => [key, localStorage.getItem(key)])),
+        points: points(), nodes: q('#allocated-count').textContent,
+        stats: q('#total-stats-list').textContent,
+        bonuses: q('.advanced-details').textContent,
+        scenario: q('#legendary-scenario-armorDamageReduction')?.value,
+        feedback: q('#allocation-message').textContent, saveStatus: q('#save-status').textContent
+      });
+      const input = q('#legendary-scenario-armorDamageReduction');
+      input.value = '30.66'; input.dispatchEvent(new Event('input', {bubbles:true}));
+      window.originalWorkspace = workspaceSnapshot();
+      window.originalStage = q('#board-stage');
+      window.fullscreenChanges = 0;
+      document.addEventListener('fullscreenchange', () => fullscreenChanges++);
+      window.fullscreenWrites = 0;
+      const store = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (...args) { fullscreenWrites++; return store.apply(this, args); };
+      q('#zoom-in').click();
+      window.originalHeight = originalStage.clientHeight;
+      window.cameraCenter = () => {
+        const stage = originalStage.getBoundingClientRect(), frame = q('#board-frame').getBoundingClientRect();
+        return [frame.x + frame.width / 2 - stage.x - stage.width / 2,
+          frame.y + frame.height / 2 - stage.y - stage.height / 2];
+      };
+    `);
+    const dragFrom = await evaluate(`{
+      const bounds = originalStage.getBoundingClientRect();
+      ({x: bounds.left + 20, y: bounds.top + 200});
+    }`);
+    const dragTo = { x: dragFrom.x + 30, y: dragFrom.y + 20 };
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", button: "left", clickCount: 1, ...dragFrom });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", buttons: 1, ...dragTo });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", button: "left", clickCount: 1, ...dragTo });
+    await evaluate(`
+      window.originalCamera = q('#board-frame').style.transform;
+      window.originalCenter = cameraCenter();
+      check(Math.abs(originalCenter[0] - 30) < 1, 'Camera is panned before entering fullscreen');
+    `);
+    await click(fullscreenControl);
+    await until(() => evaluate(`${nativeFullscreen} && ${fullscreenControl}.textContent === 'Exit Fullscreen'`));
+    await evaluate(`
+      check(!(${fallbackFullscreen}) && q('#board-stage') === originalStage, 'Chrome presents the original board in native fullscreen');
+      check(!q('#board-workspace').querySelector('.topbar, .advanced-details, .external-attribute-panel'), 'Page-only sections stay outside the target');
+      check(workspaceSnapshot() === originalWorkspace && fullscreenWrites === 0, 'Entering makes no calculation or save changes');
+      check(q('#board-frame').style.transform === originalCamera &&
+        cameraCenter().every((value, index) => Math.abs(value - originalCenter[index]) < 1), 'Resize preserves camera relative to stage center');
+      check(originalStage.clientHeight > originalHeight, 'Fullscreen increases usable stage height');
+    `);
+    await evaluate("document.exitFullscreen()");
+    await until(() => evaluate(`!(${nativeFullscreen}) && ${exitFocused}`));
+    await evaluate(`
+      check(fullscreenChanges >= 2 && workspaceSnapshot() === originalWorkspace && fullscreenWrites === 0,
+        'Fullscreenchange handles external exit without saving or recalculating');
+      check(q('#board-frame').style.transform === originalCamera, 'Exit preserves zoom and pan');
+      localStorage.removeItem(${JSON.stringify(v2)});
+      localStorage.removeItem(${JSON.stringify(v1)});
+      localStorage.removeItem(${JSON.stringify(externalKey)});
+    `);
+    await reload();
+    await evaluate("window.scrollTo(0, 0)");
+    await checkWorkspaceLayout();
+    await screenshot("stage-1-desktop-normal");
+    await evaluate("q('#workspace-help summary').focus()");
+    await key("Enter", "Enter", 13);
+    await evaluate(`
+      check(q('#workspace-help').open && q('.workspace-help-content').textContent.includes('Provisional costs'), 'Help reveals provisional costs by keyboard');
+      check(points() === 0 && q('#allocated-count').textContent === '1' && q('#save-status').textContent
+        && !q('#allocation-reset').disabled, 'Compact header exposes live counts, save status and reset');
+    `);
+    await key("Enter", "Enter", 13);
+    await evaluate("q('.external-attribute-panel > summary').focus()");
+    await key("Enter", "Enter", 13);
+    await evaluate(`
+      check(q('.external-attribute-panel').open, 'External Attributes opens by keyboard');
+      check(qa('.external-attribute-inputs input').length === 4, 'All external inputs present');
+      window.setExternal = (attribute, value) => {
+        const input = q('#external-' + attribute);
+        input.value = value; input.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      const originalParagon = q('#paragon-strength').textContent;
+      setExternal('strength', '630'); setExternal('intelligence', '215');
+      setExternal('willpower', '190'); setExternal('dexterity', '40');
+      check(q('#total-strength').textContent === '630' && q('#paragon-strength').textContent === originalParagon,
+        'External input immediately updates thresholds separately from Paragon gains');
+      const externalSave = localStorage.getItem(${JSON.stringify(externalKey)});
+      setExternal('strength', '-1');
+      check(q('#external-strength').getAttribute('aria-invalid') === 'true' && q('#total-strength').textContent === '630'
+        && localStorage.getItem(${JSON.stringify(externalKey)}) === externalSave, 'Invalid input leaves calculations and storage intact');
+      setExternal('strength', '630');
+    `);
+    await screenshot("stage-1-external-attributes");
+    await key("Enter", "Enter", 13);
+    await evaluate(`
+      check(!q('.external-attribute-panel').open && qa('#external-attribute-summary span').map(span => span.textContent).join(',')
+        === 'STR 630,INT 215,WIL 190,DEX 40', 'Collapsed summary shows the four valid values');
+    `);
+    await reload();
+    await evaluate(`
+      window.scrollTo(0, 0);
+      check(!q('.external-attribute-panel').open && q('#external-strength').value === '630' &&
+        q('#external-attribute-summary').textContent.includes('STR 630'), 'Reload restores the values with disclosure closed');
+      ${fullscreenControl}.focus();
+    `);
+    await key("Enter", "Enter", 13);
+    await until(() => evaluate(nativeFullscreen));
+    const beforeZoom = await evaluate("q('#board-frame').style.transform");
+    await click("q('#zoom-out')");
+    assert.notEqual(await evaluate("q('#board-frame').style.transform"), beforeZoom);
+    await click("q('#zoom-reset')");
+    await checkWorkspaceLayout();
+    await screenshot("stage-1-desktop-fullscreen");
+    await click("gate('board00',283)");
+    await evaluate(`
+      check(points() === 1 && q('#allocated-count').textContent === '2' && q('#allocation-message').textContent.includes('Allocated'),
+        'Native fullscreen interaction updates counters and feedback');
+      const row = q('#total-stats-list button');
+      row.focus();
+      check(gate('board00',283).matches('.node--stat-highlight'), 'Total Stats focus highlights the contributor');
+      check(tip(gate('board00',283)).includes('+5 Strength') && !q('#node-tooltip').hidden, 'Node tooltip works in fullscreen');
+    `);
+    await click("gate('board00',283)", "right");
+    await evaluate("check(points() === 0 && q('#allocation-message').textContent.includes('Refunded'), 'Right-click refunds in fullscreen')");
+    await click("attach('board00',10)");
+    await evaluate("check(pick().matches(':modal') && document.activeElement === option('board01'), 'Attachment picker is visible and focused in native fullscreen')");
+    await click("option('board01')");
+    await until(() => evaluate("!pick().open && save().boards.length === 2 && points() === 0"));
+    await click("q('#zoom-reset')");
+    await click("manage('board01')");
+    await click("action('data-rotation-step=\"90\"')");
+    await click("q('#board-management-close')");
+    await evaluate("check(save().boards[1].rotation === 90, 'Fullscreen management persists rotation')");
+    await click("q('#zoom-reset')");
+    await checkWorkspaceLayout();
+    await screenshot("stage-1-desktop-fullscreen-multiple");
+    await click("gate('board00',136)");
+    await evaluate("check(q('#glyph-picker').matches(':modal'), 'Glyph picker opens in the native top layer')");
+    await click("q('#glyph-options [data-glyph-sno-id=\"2073373\"]')");
+    await evaluate(`
+      const level = q('#glyph-level');
+      level.value = '25'; level.dispatchEvent(new Event('input', {bubbles:true}));
+    `);
+    await screenshot("stage-1-desktop-fullscreen-glyph");
+    await click("q('#glyph-save')");
+    await until(() => evaluate("!q('#glyph-picker').open && save().boards[0].glyph?.level === 25"));
+    const draft = await evaluate("raw()");
+    await click(fullscreenControl);
+    await until(() => evaluate(`!(${nativeFullscreen}) && ${exitFocused}`));
+    assert.equal(await evaluate("raw()"), draft);
+  });
+
+  await t.test("mobile fullscreen fallback, resize, and Escape priority", async () => {
+    await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 740, deviceScaleFactor: 1, mobile: true });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    await reload();
+    await evaluate("window.scrollTo(0, 0)");
+    await checkWorkspaceLayout();
+    await screenshot("stage-1-mobile-normal");
+    const saved = await evaluate("raw()");
+    await evaluate(`
+      window.rejectedFullscreen = 0;
+      q('#board-workspace').requestFullscreen = () => {
+        rejectedFullscreen++;
+        return Promise.reject(new DOMException('Fullscreen permission denied', 'NotAllowedError'));
+      };
+      window.scrollTo(0, 50);
+      window.mobileScroll = scrollY;
+      window.mobileCamera = q('#board-frame').style.transform;
+    `);
+    await tap(fullscreenControl);
+    await until(() => evaluate(fallbackFullscreen));
+    await evaluate(`
+      const rect = q('#board-workspace').getBoundingClientRect();
+      check(rejectedFullscreen === 1 && !document.fullscreenElement && rect.y === 0 && rect.height === innerHeight,
+        'Rejected native request opens the viewport-filling fallback');
+      check(q('.topbar').inert && q('.advanced-details').inert && q('.external-attribute-panel').inert &&
+        getComputedStyle(document.documentElement).overflow === 'hidden', 'Fallback isolates surrounding controls and locks document scrolling');
+      check(q('#board-frame').style.transform === mobileCamera, 'Fallback preserves camera');
+    `);
+    await tap("q('#zoom-reset')");
+    await checkWorkspaceLayout();
+    await screenshot("stage-1-mobile-expanded");
+    await tap("gate('board00',136)");
+    await evaluate("check(q('#glyph-picker').matches(':modal'), 'Touch opens the glyph picker inside fallback')");
+    await key("Escape", "Escape", 27);
+    await until(() => evaluate(`!q('#glyph-picker').open && ${fallbackFullscreen} && document.activeElement === gate('board00',136)`));
+    await tap("q('.gate-attachment')");
+    await evaluate("check(pick().open, 'Touch opens the attachment picker in fallback')");
+    await key("Escape", "Escape", 27);
+    await until(() => evaluate(`!pick().open && ${fallbackFullscreen} && document.activeElement === q('.gate-attachment')`));
+    await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 640, deviceScaleFactor: 1, mobile: true });
+    await paintWorkspace();
+    await evaluate(`
+      check(q('#board-workspace').getBoundingClientRect().width === 320, 'Fallback tracks viewport resize');
+      const stage = q('#board-stage'), grid = q('.board-grid');
+      window.expectedFitWidth = () => {
+        const style = getComputedStyle(stage);
+        const padding = parseFloat(style.getPropertyValue('--connected-fit-top')) + parseFloat(style.getPropertyValue('--connected-fit-bottom'));
+        return grid.offsetWidth * Math.min(1, Math.max(100, stage.clientWidth - 48) / grid.offsetWidth,
+          Math.max(100, stage.clientHeight - padding) / grid.offsetHeight);
+      };
+    `);
+    await tap("q('#zoom-reset')");
+    await checkWorkspaceLayout();
+    await evaluate("check(Math.abs(q('.board-grid').getBoundingClientRect().width - expectedFitWidth()) < 1, 'Fit uses resized stage dimensions')");
+    await key("Escape", "Escape", 27);
+    await until(() => evaluate(`!(${fallbackFullscreen}) && ${exitFocused}`));
+    await evaluate(`
+      check(scrollY === mobileScroll && !q('.external-attribute-panel').inert && !q('.advanced-details').inert,
+        'Fallback exit restores page scrolling and focus');
+      q('.advanced-details summary').scrollIntoView({block:'center'});
+      q('.advanced-details summary').click();
+      check(q('.advanced-details').open && scrollY > mobileScroll, 'Advanced Details remains accessible in normal mode');
+      q('.advanced-details').open = false;
+      window.scrollTo(0, 0);
+      q('#board-workspace').requestFullscreen = undefined;
+    `);
+    await tap(fullscreenControl);
+    await until(() => evaluate(fallbackFullscreen));
+    await tap(fullscreenControl);
+    await until(() => evaluate(`!(${fallbackFullscreen}) && ${exitFocused}`));
+    assert.equal(await evaluate("raw()"), saved);
+  });
   assert.deepEqual(errors, []);
 });
