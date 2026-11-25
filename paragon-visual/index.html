@@ -48,7 +48,7 @@
           <div class="allocation-main">
             <div class="allocation-copy">
               <h2 id="allocation-title">Point allocation</h2>
-              <p class="allocation-instructions">Click or tap a highlighted node to allocate it. Right-click to refund. With a node focused, use Enter or Space to allocate and Delete to refund.</p>
+              <p class="allocation-instructions">Click or tap a highlighted node to allocate it. Open a glyph socket to manage its glyph or allocate the socket. Right-click or press Delete on a focused node to refund.</p>
               <p id="allocation-message" class="allocation-message" role="status" aria-live="polite">Starting node is active.</p>
             </div>
             <dl class="allocation-stats">
@@ -129,6 +129,42 @@
               <div id="board-management-actions" class="board-management-actions"></div>
             </div>
           </dialog>
+          <dialog id="glyph-picker" class="board-picker glyph-picker" aria-labelledby="glyph-picker-title" aria-describedby="glyph-picker-note">
+            <div class="board-picker-panel glyph-picker-panel">
+              <header class="board-picker-header">
+                <h2 id="glyph-picker-title">Glyph socket</h2>
+                <button id="glyph-picker-close" type="button" aria-label="Close glyph picker" autofocus>×</button>
+              </header>
+              <p id="glyph-picker-note">Primary bonuses apply when the socket is allocated. Additional and Legendary effects are shown for reference.</p>
+              <div class="glyph-socket-actions">
+                <span id="glyph-socket-state"></span>
+                <button id="glyph-allocate-socket" type="button">Allocate socket</button>
+              </div>
+              <p id="glyph-session-note" hidden>Inspector glyph edits last until reload.</p>
+              <div class="glyph-picker-content">
+                <div class="glyph-browser">
+                  <label for="glyph-search">Search glyphs</label>
+                  <input id="glyph-search" type="search" placeholder="Glyph name" autocomplete="off">
+                  <ul id="glyph-options" aria-label="Paladin glyphs"></ul>
+                  <p id="glyph-no-matches" hidden>No matching glyphs.</p>
+                </div>
+                <div class="glyph-preview">
+                  <div id="glyph-preview-heading" class="glyph-preview-heading"></div>
+                  <p id="glyph-progression" role="status"></p>
+                  <div id="glyph-bonus-descriptions" class="glyph-bonus-descriptions"></div>
+                  <label class="glyph-level" for="glyph-level">Glyph level
+                    <input id="glyph-level" type="number" inputmode="numeric" required step="1" aria-describedby="glyph-progression glyph-level-note">
+                  </label>
+                  <p id="glyph-level-note"></p>
+                </div>
+              </div>
+              <p id="glyph-feedback" role="status" hidden></p>
+              <footer class="glyph-picker-actions">
+                <button id="glyph-remove" type="button" hidden>Remove glyph</button>
+                <button id="glyph-save" type="button">Save glyph</button>
+              </footer>
+            </div>
+          </dialog>
         </div>
         <footer class="board-footer">
           <div id="legend" class="legend" aria-label="Node color legend">
@@ -139,6 +175,7 @@
             <span class="legend-item"><i class="swatch swatch--socket"></i>Socket</span>
             <span class="legend-item"><i class="swatch swatch--gate"></i>Gate</span>
             <span class="legend-item"><i class="swatch swatch--start"></i>Starting</span>
+            <label class="legend-item glyph-radius-toggle"><input id="show-glyph-radii" type="checkbox" checked> Glyph radii</label>
           </div>
           <p class="connection-note">Only orthogonally adjacent occupied nodes connect. Allocated paths are highlighted in red.
             <span id="board-picker-hint" hidden>Use + beside a free gate or open its board menu to attach another board.</span>
@@ -146,12 +183,12 @@
         </footer>
 
         <details class="advanced-details">
-          <summary>Advanced Calculation Details <span>Verified breakdowns and diagnostics</span></summary>
+          <summary>Advanced Calculation Details <span>Breakdowns and diagnostics</span></summary>
           <div class="advanced-details__content">
         <section class="attribute-panel" aria-labelledby="attribute-panel-title">
           <div class="attribute-panel-heading">
             <div>
-              <h2 id="attribute-panel-title">Verified Paragon bonuses</h2>
+              <h2 id="attribute-panel-title">Calculated Paragon bonuses</h2>
               <p>Bonuses from allocated Paragon nodes only; these are not your complete character attributes.</p>
               <p id="calculation-scope-note" class="calculation-scope-note">Loading calculation scope…</p>
             </div>
@@ -179,8 +216,8 @@
         <section class="raw-bonus-panel" aria-labelledby="raw-bonus-title">
           <div class="raw-bonus-heading">
             <div>
-              <h2 id="raw-bonus-title">Verified raw bonuses</h2>
-              <p>Unamplified bonuses from allocated nodes. Damage categories are kept separate; no glyph effects are applied.</p>
+              <h2 id="raw-bonus-title">Verified native node bonuses</h2>
+              <p>Unamplified bonuses from allocated nodes, including active Rare bonuses.</p>
             </div>
           </div>
           <div class="raw-bonus-totals">
@@ -281,6 +318,11 @@
               <dl><div><dt>Base</dt><dd id="raw-movement-speed-base">+0%</dd></div><div><dt>Conditional</dt><dd id="raw-movement-speed-conditional">+0%</dd></div><div><dt>Total</dt><dd id="raw-movement-speed-total">+0%</dd></div></dl>
             </article>
           </div>
+        </section>
+        <section id="glyph-calculation-details" class="raw-bonus-panel" aria-labelledby="glyph-calculation-title" hidden>
+          <div class="raw-bonus-heading"><h2 id="glyph-calculation-title">Primary glyph contributions</h2></div>
+          <p id="amplification-global-details" hidden></p>
+          <ul id="glyph-calculation-list"></ul>
         </section>
           </div>
         </details>

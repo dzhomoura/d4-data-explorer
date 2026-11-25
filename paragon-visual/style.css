@@ -460,6 +460,224 @@ button:disabled {
   outline-offset: 1px;
 }
 
+.glyph-picker-panel {
+  width: min(100%, 660px);
+  overflow: hidden;
+}
+
+.glyph-socket-actions,
+.glyph-picker-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #d2bd99;
+}
+
+.glyph-socket-actions {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.glyph-picker-content {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 1.65fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.glyph-browser,
+.glyph-preview {
+  min-height: 0;
+  min-width: 0;
+}
+
+.glyph-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.glyph-picker input {
+  min-width: 0;
+  border: 1px solid #775837;
+  border-radius: 3px;
+  padding: 6px 8px;
+  background: #151315;
+  color: #f4e3ba;
+  font: inherit;
+}
+
+.glyph-picker input:focus-visible {
+  outline: 2px solid #efd18a;
+  outline-offset: 1px;
+}
+
+#glyph-options {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 0;
+  max-height: 330px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+
+#glyph-options button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+}
+
+#glyph-options button[aria-pressed="true"] {
+  border-color: #af8ccf;
+  background: #302237;
+}
+
+.glyph-preview {
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #584337;
+  border-radius: 3px;
+  padding: 10px;
+  background: #131114;
+}
+
+.glyph-preview-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.glyph-preview h3,
+.glyph-preview h4 {
+  margin: 0;
+  color: #f3d8a5;
+}
+
+.glyph-preview h3 {
+  font: 18px Georgia, serif;
+}
+
+.glyph-preview-heading p,
+.glyph-bonus-descriptions p {
+  margin: 2px 0 0;
+}
+
+#glyph-progression[data-rarity="rare"] {
+  color: #d6b5ee;
+}
+
+#glyph-progression[data-rarity="legendary"] {
+  color: #efca85;
+}
+
+p.glyph-legendary-status {
+  color: #d3b78b;
+}
+
+.glyph-bonus-descriptions section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #493845;
+}
+
+p.glyph-requirement {
+  color: #d9b2f4;
+}
+
+p.glyph-primary-result {
+  color: #d9b2f4;
+  overflow-wrap: anywhere;
+}
+
+.glyph-preview p.glyph-primary-result:empty {
+  display: none;
+}
+
+#glyph-calculation-list p {
+  margin: 4px 0 8px;
+}
+
+#glyph-calculation-list details ul {
+  padding-inline-start: 20px;
+  font: 13px/1.45 Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.node-tooltip p.glyph-primary-result {
+  margin: 7px 0 0;
+  font: 12px/1.4 Arial, sans-serif;
+}
+
+.glyph-level {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.glyph-level input {
+  width: 76px;
+}
+
+.glyph-picker-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+#glyph-feedback {
+  color: #f4b097;
+}
+
+.glyph-emblem {
+  --glyph-color: #e6c081;
+  display: inline-grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--glyph-color);
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #392941, #171119 72%);
+  color: var(--glyph-color);
+  font: 700 9px/1 Georgia, serif;
+  pointer-events: none;
+}
+
+.glyph-emblem[data-icon-handle="3933961978"] { --glyph-color: #a9d5c5; }
+.glyph-emblem[data-icon-handle="2456702841"] { --glyph-color: #9dc8eb; }
+.glyph-emblem[data-icon-handle="2519972743"] { --glyph-color: #ed9f94; }
+.glyph-emblem[data-icon-handle="2456478681"] { --glyph-color: #e0b5ff; }
+
+@media (max-width: 600px) {
+  .glyph-picker-content {
+    grid-template-columns: 1fr;
+    grid-auto-rows: max-content;
+    gap: 8px;
+    overflow: auto;
+    padding: 2px;
+    overscroll-behavior: contain;
+  }
+
+  #glyph-options {
+    max-height: 115px;
+  }
+
+  .glyph-preview {
+    overflow: visible;
+  }
+
+  .glyph-picker-panel {
+    padding: 9px;
+  }
+}
+
 .board-picker-panel button:disabled {
   border-color: #3e352a;
   background: #191714;
@@ -975,6 +1193,7 @@ button:disabled {
 
 .board-stage {
   --connected-fit-top: 72px;
+  --tooltip-top-margin: 10px;
   --connected-fit-bottom: 36px;
   position: relative;
   min-height: min(72vh, 760px);
@@ -1025,12 +1244,36 @@ button:disabled {
   pointer-events: none;
 }
 
-.board-connections {
+.board-connections,
+.glyph-radius-layer {
   position: absolute;
   inset: 0;
   z-index: 0;
   overflow: visible;
   pointer-events: none;
+}
+
+.glyph-radius-layer polygon {
+  fill: #b185db12;
+  stroke: #b185dbaf;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.glyph-radius-layer polygon[data-rarity="legendary"] {
+  fill: #daa65114;
+  stroke: #daa651c4;
+  stroke-dasharray: none;
+}
+
+.glyph-radius-toggle {
+  cursor: pointer;
+}
+
+.glyph-radius-toggle input {
+  margin: 0;
+  accent-color: #b185db;
 }
 
 .board-connections line {
@@ -1174,6 +1417,27 @@ button:disabled {
   opacity: 0.75;
 }
 
+.node--amplified::after {
+  border-color: #efc8ff;
+  background: #b470c999;
+  opacity: 1;
+}
+
+.node--occupied-socket .glyph-emblem {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  transform: rotate(-45deg);
+}
+
+.node--occupied-socket:not(.node--allocated) {
+  background: #382644;
+  color: #dbb0ff;
+}
+
 .node--stat-highlight {
   z-index: 3;
   outline: 2px solid #f5dc94;
@@ -1199,9 +1463,9 @@ button:disabled {
 
 .node-tooltip {
   position: absolute;
-  z-index: 5;
+  z-index: 7;
   width: min(330px, calc(100% - 20px));
-  max-height: calc(100% - 20px);
+  max-height: calc(100% - var(--tooltip-top-margin) - 10px);
   overflow: auto;
   padding: 14px 16px;
   border: 1px solid #9a7946;
@@ -1449,6 +1713,7 @@ button:disabled {
 
   .board-stage {
     --connected-fit-top: 58px;
+    --tooltip-top-margin: 58px;
     --connected-fit-bottom: 172px;
     min-height: max(490px, 70vh);
   }

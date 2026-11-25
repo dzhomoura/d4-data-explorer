@@ -3,12 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   attachBoard, buildBoardInstanceLayout, buildConnectedLayout, calculateConnectedBonuses, createStartingLayout,
-  DEFAULT_ATTACHMENT, planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, reachableAllocations, removeConnectedBoard,
-  rotateConnectedBoard, validateConnectedAllocation, writeConnectedSave, writeConnectedSaveV2
+  configureConnectedGlyph, DEFAULT_ATTACHMENT, planConnectedBoardReset, readConnectedSave, readConnectedSaveV2,
+  reachableAllocations, removeConnectedBoard, retainConnectedGlyphs, rotateConnectedBoard, validateConnectedAllocation,
+  writeConnectedSave, writeConnectedSaveV2
 } from "../paragon-visual/connected-boards.js";
 import { BOARD_ROTATIONS, getBoardControlPositions, rotateBoardPoint } from "../paragon-visual/board-rotation.js";
 import { mergeSharedNodeDefinitions } from "../paragon-visual/shared-node-definitions.js";
 import { calculateParagonBonuses } from "../paragon-visual/paragon-calculator.js";
+import { getGlyphSocketSourceIndex, paladinGlyphCatalogue } from "../paragon-visual/paladin-glyph-catalogue.js";
+import { getGlyphProgression } from "../paragon-visual/glyph-progression.js";
+import { getGlyphRadiusMembership, manhattanDistance } from "../paragon-visual/glyph-spatial.js";
 
 const resources = new Map();
 for (let index = 0; index < 10; index++) {
@@ -368,4 +372,235 @@ test("board reset plans preserve the root and reject dependent branches without 
   assert.deepEqual(safeStarting.candidate, new Set([layout.root]));
   assert.equal(safeStarting.refunded, 1);
   assert.throws(() => planConnectedBoardReset(layout, allocated, "missing"), /equipped board/);
+});
+
+test("all ten socket cells use the pinned source index through valid board rotations", () => {
+  const sourceIndices = [136, 120, 264, 222, 178, 320, 262, 320, 110, 136];
+  for (const [number, boardId] of [...resources.keys()].entries()) {
+    const sourceIndex = sourceIndices[number];
+    const board = resources.get(boardId).board;
+    assert.equal(getGlyphSocketSourceIndex(board), sourceIndex);
+    const x = sourceIndex % 21;
+    const y = Math.floor(sourceIndex / 21);
+    const coordinates = [[x, y], [20 - y, x], [20 - x, 20 - y], [y, 20 - x]];
+    const entryGates = [430, 230, 10, 210];
+    for (const [turn, [expectedX, expectedY]] of coordinates.entries()) {
+      if (number === 0 && turn !== 0) continue;
+      const instances = [starting];
+      if (number !== 0) instances.push(child("socket-test", boardId, 1, "start", 10, entryGates[turn], turn * 90));
+      const layout = buildBoardInstanceLayout(resources, instances);
+      const instance = layout.boards[number === 0 ? 0 : 1];
+      const socket = layout.nodes.get(`${instance.instanceId}:${sourceIndex}`);
+      assert.ok(socket.definition.hasSocket);
+      assert.equal(socket.definition.snoId, 681756);
+      assert.deepEqual(socket.displayPosition, { x: instance.origin.x + expectedX, y: instance.origin.y + expectedY });
+      for (const radius of [3, 4, 5]) {
+        const source = getGlyphRadiusMembership(board, instance.instanceId, radius);
+        const displayed = [...layout.nodes.values()].filter(node => node.instanceId === instance.instanceId
+          && node !== socket && manhattanDistance(node.displayPosition, socket.displayPosition) <= radius);
+        assert.deepEqual(displayed.map(node => node.sourceIndex), source.nodes.map(node => node.sourceIndex));
+        assert.ok(source.nodes.every(node => node.instanceId === instance.instanceId));
+        assert.ok([...layout.nodes.values()].every(node => node.instanceId === instance.instanceId
+          || manhattanDistance(node.displayPosition, socket.displayPosition) > radius));
+      }
+    }
+  }
+});
+
+test("glyph assignment, replacement, level and removal round trip without changing calculations", () => {
+  const { layout, allocated } = attachPlan([["board00:10", "board01", "castle"]]);
+  allocatePath(layout, allocated, "board00:136");
+  allocatePath(layout, allocated, "castle:120");
+  allocatePath(layout, allocated, "castle:57");
+  const attributes = { Strength: 2500, Intelligence: 500, Willpower: 850, Dexterity: 0 };
+  const baseline = calculateConnectedBonuses(layout, allocated, attributes);
+  assert.ok(baseline.nodeEvaluations.some(node => node.nodeId === "castle:57" && node.thresholds.some(t => t.satisfied)));
+  let glyphs = new Map();
+  for (const configuration of [
+    { snoId: 2073373, level: 1 },
+    { snoId: 2073373, level: 24 },
+    { snoId: 2073373, level: 25 },
+    { snoId: 2073373, level: 49 },
+    { snoId: 2073373, level: 50 },
+    { snoId: 2073373, level: 51 },
+    { snoId: 2478228, level: 1 },
+    { snoId: 2478228, level: 150 },
+    null
+  ]) {
+    glyphs = configureConnectedGlyph(layout, glyphs, "castle", configuration);
+    const payload = writeConnectedSaveV2(layout, allocated, glyphs);
+    assert.deepEqual(payload.boards[1].glyph, configuration ?? undefined);
+    const restored = readConnectedSaveV2(resources, JSON.parse(JSON.stringify(payload)));
+    assert.deepEqual(restored.glyphs, glyphs);
+    assert.deepEqual(getGlyphProgression(restored.glyphs.get("castle")?.level), getGlyphProgression(configuration?.level));
+    assert.deepEqual(restored.allocated, allocated);
+    assert.deepEqual(calculateConnectedBonuses(restored.layout, restored.allocated, attributes), baseline);
+  }
+});
+
+test("glyphs follow a board instance through rotation and point reset, and leave with removal", () => {
+  const { layout, allocated } = attachPlan([["board00:10", "board01", "castle"]]);
+  const glyph = { snoId: 2073373, level: 50 };
+  let glyphs = configureConnectedGlyph(layout, new Map(), "board00", glyph);
+  glyphs = configureConnectedGlyph(layout, glyphs, "castle", glyph);
+  const rotated = rotateConnectedBoard(resources, layout, allocated, "castle", 90);
+  assert.deepEqual(readConnectedSaveV2(resources, writeConnectedSaveV2(rotated, allocated, glyphs)).glyphs, glyphs);
+  allocatePath(rotated, allocated, "castle:120");
+  const reset = planConnectedBoardReset(rotated, allocated, "castle").candidate;
+  assert.deepEqual(readConnectedSaveV2(resources, writeConnectedSaveV2(rotated, reset, glyphs)).glyphs, glyphs);
+  const removed = removeConnectedBoard(resources, rotated, reset, "castle");
+  const retained = retainConnectedGlyphs(removed, glyphs);
+  assert.deepEqual([...retained], [["board00", glyph]]);
+  const reattached = attachBoard(resources, removed, reset, "board00:10", "board01", "new-castle");
+  assert.equal(writeConnectedSaveV2(reattached, reset, retained).boards[1].glyph, undefined);
+  assert.throws(() => configureConnectedGlyph(removed, retained, "castle", glyph), /equipped board/);
+});
+
+test("legacy saves omit glyph fields and invalid saved glyphs leave board data and valid glyphs readable", () => {
+  const { layout, allocated } = attachPlan([["board00:10", "board01", "castle"]]);
+  const payload = writeConnectedSaveV2(layout, allocated);
+  const old = readConnectedSaveV2(resources, payload);
+  assert.equal(old.glyphs.size, 0);
+  assert.deepEqual(writeConnectedSaveV2(old.layout, old.allocated, old.glyphs), payload);
+  for (const glyph of [null, [], "Challenger", {}, { snoId: "2073373", level: 1 },
+    { snoId: 2479231, level: 1 }, { snoId: 2073373, level: 0 }, { snoId: 2073373, level: 151 },
+    { snoId: 2073373, level: 3.5 }, { snoId: 2073373, level: "25" }]) {
+    const good = { snoId: 2073373, level: 150 };
+    const boards = [{ ...payload.boards[0], glyph }, { ...payload.boards[1], glyph: good }];
+    const restored = readConnectedSaveV2(resources, { ...payload, boards });
+    assert.deepEqual(restored.allocated, allocated);
+    assert.deepEqual(restored.invalidGlyphBoards, ["board00"]);
+    assert.deepEqual([...restored.glyphs], [["castle", good]]);
+    if (glyph !== null) assert.throws(() => configureConnectedGlyph(layout, new Map(), "board00", glyph), /valid planner level/);
+    assert.throws(() => writeConnectedSaveV2(layout, allocated, new Map([["board00", glyph]])), /Invalid glyph/);
+  }
+});
+
+const glyphPath = [304, 303, 282, 281, 260, 239, 240, 219, 198, 177, 178, 157, 136];
+
+test("connected Primary pools react to radius and allocations while keeping Rare thresholds and external stats independent", () => {
+  const layout = createStartingLayout(resources);
+  const allocated = new Set([...glyphPath, 179, 137, 138, 139, 140, 141, 305, 135, 114, 93].map(index => `board00:${index}`));
+  const external = { Strength: 1000, Intelligence: 500, Willpower: 50, Dexterity: 0 };
+  const run = (level, snoId = 1029487, nodes = allocated, stats = external) =>
+    calculateConnectedBonuses(layout, nodes, stats, new Map([["board00", { level, snoId }]]));
+  for (const [level, pool, expected] of [[24, 5, [179]], [25, 15, [140, 179, 198]],
+    [50, 15, [140, 179, 198]], [51, 20, [140, 141, 179, 198]], [50, 15, [140, 179, 198]]]) {
+    const result = run(level);
+    const [glyph] = result.glyphEvaluations;
+    assert.equal(glyph.localAttribute, pool);
+    assert.deepEqual(glyph.contributions.map(node => node.sourceIndex), expected);
+    assert.deepEqual(glyph.contributions.map(node => node.nodeId), expected.map(index => `board00:${index}`));
+    assert.equal(result.verifiedParagonBonuses.rawBonuses.nonPhysicalDamage.total, glyph.percentagePoints);
+  }
+  const native = calculateConnectedBonuses(layout, allocated, external);
+  const turf = run(100, 2506847);
+  assert.equal(turf.glyphEvaluations[0].contributions.find(node => node.sourceIndex === 93).attributeValue, 10);
+  assert.deepEqual(turf.nodeEvaluations, native.nodeEvaluations);
+  assert.deepEqual(turf.totalAttributes, native.totalAttributes);
+  assert.ok(!turf.verifiedParagonBonuses.rawBonuses.damage.glyph);
+  assert.deepEqual(run(51, 1029487, allocated, { ...external, Intelligence: 1500 }).glyphEvaluations, run(51).glyphEvaluations);
+  assert.equal(run(51, 1029487, new Set([...allocated].filter(id => id !== "board00:141"))).glyphEvaluations[0].localAttribute, 15);
+  const socketRefunded = new Set(glyphPath.slice(0, -1).map(index => `board00:${index}`));
+  assert.deepEqual(run(51, 1029487, socketRefunded), calculateConnectedBonuses(layout, socketRefunded, external));
+  const reset = planConnectedBoardReset(layout, allocated, "board00").candidate;
+  assert.deepEqual(run(150, 1029487, reset), calculateConnectedBonuses(layout, reset, external));
+});
+
+test("multiple active glyphs survive save and rotation, and shared destinations sum each socket exactly once", () => {
+  const { layout } = attachPlan([["board00:10", "board01", "castle"]]);
+  const allocated = reachableAllocations(layout.graph, new Set(layout.nodes.keys()), layout.root);
+  const external = { Strength: 1000, Intelligence: 150, Willpower: 100, Dexterity: 0 };
+  const glyphs = new Map([["board00", { snoId: 1029487, level: 150 }], ["castle", { snoId: 1029487, level: 25 }]]);
+  const original = calculateConnectedBonuses(layout, allocated, external, glyphs);
+  const [first, second] = original.glyphEvaluations;
+  const total = original.verifiedParagonBonuses.rawBonuses.nonPhysicalDamage;
+  assert.deepEqual(total, { unconditional: 0, conditional: 0, total: first.percentagePoints + second.percentagePoints,
+    glyph: first.percentagePoints + second.percentagePoints });
+  assert.ok(first.contributions.every(entry => entry.nodeId.startsWith("board00:")));
+  assert.ok(second.contributions.every(entry => entry.nodeId.startsWith("castle:")));
+  assert.deepEqual(calculateConnectedBonuses(rotateConnectedBoard(resources, layout, allocated, "castle", 90), allocated,
+    external, glyphs).glyphEvaluations, original.glyphEvaluations);
+  const saved = writeConnectedSaveV2(layout, allocated, glyphs);
+  const restored = readConnectedSaveV2(resources, saved);
+  assert.deepEqual(calculateConnectedBonuses(restored.layout, restored.allocated, external, restored.glyphs), original);
+  const reset = planConnectedBoardReset(layout, allocated, "castle").candidate;
+  const removed = removeConnectedBoard(resources, layout, reset, "castle");
+  assert.deepEqual(calculateConnectedBonuses(removed, reset, external, retainConnectedGlyphs(removed, glyphs)).glyphEvaluations, [first]);
+  const removedGlyph = configureConnectedGlyph(layout, glyphs, "castle", null);
+  assert.deepEqual(calculateConnectedBonuses(layout, allocated, external, removedGlyph).glyphEvaluations, [first]);
+  const replaced = configureConnectedGlyph(layout, glyphs, "castle", { snoId: 2506071, level: 150 });
+  const withChip = calculateConnectedBonuses(layout, allocated, external, replaced);
+  const native = calculateConnectedBonuses(layout, allocated, external);
+  const raw = { ...withChip.verifiedParagonBonuses.rawBonuses };
+  const { glyph: chipAmount, unconditional, conditional, total: physicalTotal } = raw.physicalDamage;
+  assert.equal(chipAmount, withChip.glyphEvaluations[1].percentagePoints);
+  assert.equal(physicalTotal, unconditional + conditional + chipAmount);
+  delete raw.nonPhysicalDamage;
+  raw.physicalDamage = { unconditional, conditional, total: unconditional + conditional };
+  assert.deepEqual(raw, native.verifiedParagonBonuses.rawBonuses);
+});
+
+test("operation-1 core crosses a remote Rare threshold and reverses on removal or refund", () => {
+  const { layout } = attachPlan([["board00:10", "board01", "castle"]]);
+  const allocated = reachableAllocations(layout.graph, new Set(layout.nodes.keys()), layout.root);
+  const zero = { Strength: 0, Intelligence: 0, Willpower: 0, Dexterity: 0 };
+  const nativeCore = calculateConnectedBonuses(layout, allocated, zero).totalAttributes.Strength;
+  const external = { ...zero, Strength: 629 - nativeCore };
+  const glyphs = configureConnectedGlyph(layout, new Map(), "castle", { snoId: 2073373, level: 10 });
+  const run = (nodes = allocated, configurations = glyphs) => calculateConnectedBonuses(layout, nodes, external, configurations);
+  const brawn = result => result.nodeEvaluations.find(node => node.nodeId === "board00:243").attributes[0];
+  const native = run(allocated, new Map());
+  assert.deepEqual([brawn(native).threshold.currentValue, brawn(native).threshold.requiredValue, brawn(native).conditionalApplied],
+    [629, 630, false]);
+
+  const active = run();
+  assert.equal(active.amplifiedThresholdEvidence, "source-derived-cross-board-model");
+  assert.equal(active.externalAttributes.Strength, external.Strength);
+  assert.equal(brawn(active).threshold.currentValue, active.totalAttributes.Strength);
+  assert.ok(active.totalAttributes.Strength > 630 && !Number.isInteger(active.totalAttributes.Strength));
+  assert.ok(brawn(active).conditionalApplied);
+  assert.deepEqual(run(allocated, configureConnectedGlyph(layout, glyphs, "castle", null)), native);
+  const refunded = reachableAllocations(layout.graph, new Set([...allocated].filter(id => id !== "castle:120")), layout.root);
+  assert.equal(brawn(run(refunded)).conditionalApplied, false);
+  assert.equal(run(refunded).glyphEvaluations, undefined);
+  const reset = planConnectedBoardReset(layout, allocated, "castle").candidate;
+  const removed = removeConnectedBoard(resources, layout, reset, "castle");
+  assert.equal(brawn(calculateConnectedBonuses(removed, reset, external, retainConnectedGlyphs(removed, glyphs))).conditionalApplied, false);
+
+  const withTwo = configureConnectedGlyph(layout, glyphs, "board00", { snoId: 2506253, level: 25 });
+  const combined = run(allocated, withTwo);
+  const lines = combined.effectiveNodeContributions;
+  const keys = lines.map(line => JSON.stringify([line.instanceId, line.sourceIndex, line.attributeIndex]));
+  assert.equal(new Set(keys).size, keys.length);
+  assert.equal(combined.glyphEvaluations.length, 2);
+  assert.equal(lines.filter(line => line.glyphSnoId).length,
+    combined.glyphEvaluations.reduce((sum, glyph) => sum + glyph.contributions.length, 0));
+  assert.ok(Math.abs(lines.filter(line => line.attributeId === 9).reduce((sum, line) => sum + line.effectiveAmount, 0)
+    - combined.verifiedParagonBonuses.coreAttributes.Strength) < 1e-9);
+  const damage = lines.filter(line => line.category === "damage").reduce((sum, line) => sum + line.effectiveAmount, 0);
+  assert.ok(Math.abs(damage - combined.verifiedParagonBonuses.rawBonuses.damage.total) < 1e-9);
+  const saved = readConnectedSaveV2(resources, writeConnectedSaveV2(layout, allocated, withTwo));
+  assert.deepEqual(calculateConnectedBonuses(saved.layout, saved.allocated, external, saved.glyphs), combined);
+  const rotated = rotateConnectedBoard(resources, layout, allocated, "castle", 90);
+  assert.deepEqual(calculateConnectedBonuses(rotated, allocated, external, withTwo), combined);
+
+  const replacement = configureConnectedGlyph(layout, withTwo, "castle", { snoId: 1029487, level: 25 });
+  const replaced = run(allocated, replacement);
+  assert.equal(replaced.glyphEvaluations[1].glyphSnoId, 1029487);
+  assert.ok(replaced.effectiveNodeContributions.every(line => line.glyphSnoId !== 2073373));
+});
+
+test("operation-1 pools expand and contract through both boundaries and update on node refunds", () => {
+  const layout = createStartingLayout(resources);
+  const allocated = reachableAllocations(layout.graph, new Set(layout.nodes.keys()), layout.root);
+  const external = { Strength: 1000, Intelligence: 1000, Willpower: 1000, Dexterity: 1000 };
+  const run = (level, nodes = allocated) => calculateConnectedBonuses(layout, nodes, external,
+    new Map([["board00", { snoId: 2073373, level }]])).glyphEvaluations[0];
+  assert.ok(run(25).affectedNodeIndices.length > run(24).affectedNodeIndices.length);
+  assert.ok(run(51).affectedNodeIndices.length > run(50).affectedNodeIndices.length);
+  assert.deepEqual(run(25).affectedNodeIndices, run(50).affectedNodeIndices);
+  const refunded = reachableAllocations(layout.graph, new Set([...allocated].filter(id => id !== "board00:139")), layout.root);
+  assert.ok(run(31).affectedNodeIndices.includes(139));
+  assert.ok(!run(31, refunded).affectedNodeIndices.includes(139));
 });

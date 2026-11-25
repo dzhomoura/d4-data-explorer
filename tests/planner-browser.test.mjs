@@ -545,5 +545,381 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
   missing = null;
   await reload();
   await evaluate("check(points() > 0 && gate('board03',178).classList.contains('node--allocated'), 'Draft restores when resources return')");
+
+  await t.test("glyph sockets in connected and inspector views", async () => {
+    const glyphDraft = {
+      version: 2, sourceRevision: revision,
+      boards: [{
+        instanceId: "board00", boardId: "board00", placementIndex: 0, rotation: 0, incoming: null,
+        allocatedSourceIndices: [304, 303, 282, 281, 260, 239, 240, 219, 198, 177, 178, 157]
+      }]
+    };
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await evaluate(`localStorage.setItem(${JSON.stringify(v2)}, ${JSON.stringify(JSON.stringify(glyphDraft))});`);
+    await reload();
+    const startingSocket = "gate('board00',136)";
+    const castleSocket = "gate('board01',120)";
+    async function captureRadius(name) {
+      // Let the dialog's asynchronous close event restore focus before dismissing its tooltip.
+      await evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: 2, y: 2 });
+      await evaluate(`q('#board-stage').focus({preventScroll:true}); document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));`);
+      await screenshot(name);
+    }
+    const installGlyphChecks = () => evaluate(`
+      window.glyphPicker = () => q('#glyph-picker');
+      window.glyphStats = () => JSON.stringify([points(), q('#allocated-count').textContent, q('#total-stats-list').textContent,
+        q('.advanced-details__content').textContent, tip(gate('board00',239))]);
+      window.glyphSearch = value => {
+        const input = q('#glyph-search'); input.value = value; input.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      window.glyphChoice = id => q('#glyph-options [data-glyph-sno-id="' + id + '"]');
+      window.glyphFor = boardId => save().boards.find(board => board.boardId === boardId)?.glyph;
+      window.radiusFor = socket => qa('.glyph-radius-layer polygon').find(diamond =>
+        diamond.dataset.boardInstanceId === socket.dataset.boardInstanceId && diamond.dataset.socketSourceIndex === socket.dataset.nodeIndex);
+      window.checkRadius = (socket, radius, rarity) => {
+        const diamond = radiusFor(socket);
+        check(diamond?.dataset.radius === String(radius) && diamond.dataset.rarity === rarity, 'Derived radius and rarity are rendered');
+        const marker = socket.getBoundingClientRect(), outline = diamond.getBoundingClientRect();
+        check(Math.abs((marker.left + marker.right - outline.left - outline.right) / 2) < 1
+          && Math.abs((marker.top + marker.bottom - outline.top - outline.bottom) / 2) < 1, 'Radius follows the socket center');
+        check(getComputedStyle(diamond).pointerEvents === 'none' && diamond.closest('svg').getAttribute('aria-hidden') === 'true',
+          'The radius is a decorative layer');
+      };
+      window.enterGlyphLevel = value => {
+        const field = q('#glyph-level'); field.value = value; field.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      window.checkGlyph = (boardId, id, level) => check(glyphFor(boardId)?.snoId === id && glyphFor(boardId).level === level,
+        'Glyph configuration belongs to ' + boardId);
+    `);
+    await installGlyphChecks();
+    const before = await evaluate("glyphStats()");
+    await evaluate(`
+      window.glyphBefore = glyphStats(); window.frameBeforeGlyph = q('#board-frame').style.transform;
+      check(!${startingSocket}.querySelector('.glyph-emblem'), 'Empty socket has no glyph icon');
+      q('#board-stage').focus({preventScroll:true});
+      gate('board00',239).dispatchEvent(new PointerEvent('pointerleave'));
+    `);
+    await screenshot("glyph-desktop-empty");
+    await evaluate(`${startingSocket}.focus({preventScroll:true});`);
+    await key("Enter", "Enter", 13);
+    await evaluate(`
+      check(glyphPicker().open && qa('#glyph-options button').length === 21, 'Socket opens the complete catalogue');
+      check(q('#glyph-picker-note').textContent.includes('when the socket is allocated'), 'Calculation scope is visible');
+      glyphSearch('  challe '); check(qa('#glyph-options button').length === 1, 'Search uses the glyph name');
+      glyphChoice(2073373).click();
+      check(qa('#glyph-bonus-descriptions h4').map(node=>node.textContent).join() === 'Primary,Additional,Legendary',
+        'Three sections describe the authored bonuses');
+      check(q('#glyph-progression').textContent.includes('Radius 3 · Rare · Next radius at level 25')
+        && q('.glyph-legendary-status').textContent.includes('Locked'), 'Low level previews a locked Legendary bonus');
+      check(q('.glyph-requirement').textContent.includes('40 Strength'), 'Additional requirement is shown');
+      q('#glyph-level').value = '151'; q('#glyph-save').click();
+      check(glyphPicker().open && q('#glyph-level').getAttribute('aria-invalid') === 'true' && !glyphFor('board00'),
+        'Out-of-range level is rejected without saving');
+      q('#glyph-level').value = '25'; q('#glyph-save').click();
+    `);
+    await until(() => evaluate(`!glyphPicker().open && document.activeElement === ${startingSocket}`));
+    await evaluate(`
+      checkGlyph('board00', 2073373, 25);
+      checkRadius(${startingSocket}, 4, 'rare');
+      check(${startingSocket}.querySelector('.glyph-emblem').textContent === 'CL' &&
+        !${startingSocket}.matches('.node--allocated'), 'The occupied marker preserves its unallocated state');
+      check(glyphStats() === glyphBefore && q('#board-frame').style.transform === frameBeforeGlyph,
+        'Glyph equip preserves points, bonuses, Rare activation and viewport');
+      ${startingSocket}.blur();
+      ${startingSocket}.dispatchEvent(new PointerEvent('pointerleave'));
+      gate('board00',239).dispatchEvent(new PointerEvent('pointerleave'));
+    `);
+    await screenshot("glyph-desktop-occupied");
+    await captureRadius("glyph-desktop-radius-4");
+    await click(startingSocket);
+    await screenshot("glyph-desktop-picker");
+    await evaluate(`
+      enterGlyphLevel(50);
+      check(q('#glyph-progression').textContent.includes('Radius 4 · Rare · Next radius at level 51'), 'Level 50 stays Rare');
+      enterGlyphLevel(51);
+      check(q('#glyph-progression').textContent.includes('Radius 5 · Legendary')
+        && q('.glyph-legendary-status').textContent === 'Available by progression', 'Level 51 previews Legendary immediately');
+      enterGlyphLevel(150);
+      check(q('#glyph-progression').textContent.includes('Maximum level'), 'Maximum glyph level is shown');
+      q('#glyph-save').click();
+      checkGlyph('board00', 2073373, 150);
+      check(glyphStats() === glyphBefore, 'Level editing preserves every displayed numerical result');
+      checkRadius(${startingSocket}, 5, 'legendary');
+      document.activeElement.blur(); document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
+    `);
+    await captureRadius("glyph-desktop-radius-5");
+    const panStart = await evaluate(`(() => {
+      const socket = ${startingSocket}.getBoundingClientRect();
+      const cellSize = radiusFor(${startingSocket}).getBoundingClientRect().width / 11;
+      const x = socket.x + socket.width / 2, y = socket.y + socket.height / 2 - cellSize;
+      check(document.elementFromPoint(x,y)?.matches('.board-cell'), 'An empty cell inside the radius receives canvas events');
+      window.beforeRadiusPan = q('#board-frame').style.transform;
+      return {x,y};
+    })()`);
+    const panEnd = { x: panStart.x + 48, y: panStart.y + 24 };
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", button: "left", clickCount: 1, ...panStart });
+    await send("Input.dispatchMouseEvent", { type: "mouseMoved", buttons: 1, ...panEnd });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", button: "left", clickCount: 1, ...panEnd });
+    await evaluate(`check(q('#board-frame').style.transform !== beforeRadiusPan, 'Drag through the radius pans the board');
+      checkRadius(${startingSocket}, 5, 'legendary'); q('#zoom-reset').click();`);
+    await evaluate(`
+      const toggle = q('#show-glyph-radii');
+      toggle.click(); check(!radiusFor(${startingSocket}) && glyphFor('board00').level === 150, 'Visibility only hides the radius');
+      toggle.click(); q('#zoom-in').click(); checkRadius(${startingSocket}, 5, 'legendary'); q('#zoom-reset').click();
+      ${startingSocket}.click(); glyphChoice(2478228).click();
+      check(q('#glyph-level').value === '1' && q('#glyph-save').textContent === 'Replace glyph', 'Replacement previews a fresh level');
+      q('#glyph-save').click();
+      checkGlyph('board00', 2478228, 1);
+      checkRadius(${startingSocket}, 3, 'rare');
+      check(glyphStats() === glyphBefore, 'Replacing a glyph preserves all displayed numerical results');
+      document.activeElement.blur(); document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));
+    `);
+    await captureRadius("glyph-desktop-radius-3");
+    await reload();
+    await installGlyphChecks();
+    await evaluate(`
+      check(glyphStats() === ${JSON.stringify(before)}, 'Numeric node data restores unchanged');
+      check(${startingSocket}.getAttribute('aria-label').includes('Law, level 1'), 'Glyph and level restore on the original socket');
+      checkRadius(${startingSocket}, 3, 'rare');
+      ${startingSocket}.click(); q('#glyph-remove').click();
+      check(!glyphFor('board00') && !${startingSocket}.querySelector('.glyph-emblem') && !radiusFor(${startingSocket}),
+        'Removal clears the glyph field, emblem and radius');
+      ${startingSocket}.click(); q('#glyph-allocate-socket').click();
+      check(${startingSocket}.matches('.node--allocated') && points() === 12, 'Explicit socket allocation uses one existing point');
+      q('#glyph-picker-close').click();
+      gate('board00',135).click();
+      ${startingSocket}.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+      check(${startingSocket}.matches('.node--allocated') && q('#allocation-message').textContent.includes('disconnect'), 'Socket refund protects descendants');
+      gate('board00',135).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+      ${startingSocket}.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+      check(!${startingSocket}.matches('.node--allocated') && points() === 11, 'Ordinary socket refund returns the existing point');
+    `);
+    await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 740, deviceScaleFactor: 1, mobile: true });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    await evaluate("q('#zoom-reset').click(); center();");
+    await screenshot("glyph-mobile-empty");
+    await tap(startingSocket);
+    await evaluate(`check(glyphPicker().open, 'Touch opens the socket'); glyphSearch('Honed'); glyphChoice(2477896).click();
+      check(q('.glyph-requirement').textContent.includes('25 Intelligence'), 'Honed uses Intelligence');`);
+    await screenshot("glyph-mobile-picker");
+    await tap("q('#glyph-save')");
+    await until(() => evaluate("!glyphPicker().open"));
+    await evaluate("q('#board-stage').focus({preventScroll:true}); gate('board00',136).dispatchEvent(new PointerEvent('pointerleave'));");
+    await screenshot("glyph-mobile-occupied");
+    await screenshot("glyph-mobile-radius-3");
+    for (const [level, radius, rarity] of [[25, 4, "rare"], [51, 5, "legendary"], [1, 3, "rare"]]) {
+      await tap(startingSocket);
+      await evaluate(`enterGlyphLevel(${level});`);
+      await tap("q('#glyph-save')");
+      await until(() => evaluate("!glyphPicker().open"));
+      await evaluate(`checkRadius(${startingSocket}, ${radius}, '${rarity}'); document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape'}));`);
+      if (radius > 3) await screenshot(`glyph-mobile-radius-${radius}`);
+    }
+    await send("Emulation.setDeviceMetricsOverride", { width: 320, height: 640, deviceScaleFactor: 1, mobile: true });
+    await evaluate("q('#zoom-reset').click(); center();");
+    await tap(startingSocket);
+    await evaluate(`const content = q('.glyph-picker-content');
+      check(content.scrollHeight > content.clientHeight, 'Narrow picker can scroll its content');
+      content.scrollTop = content.scrollHeight;
+      check(content.scrollTop > 0 && q('#glyph-save').getBoundingClientRect().bottom <= innerHeight, 'Narrow picker keeps actions accessible');`);
+    await screenshot("glyph-mobile-narrow-picker");
+    await tap("q('#glyph-picker-close')");
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await evaluate(`
+      q('#zoom-reset').click(); center(); attach('board00',10).click(); option('board01').click();
+      ${castleSocket}.click(); glyphChoice(2477896).click(); enterGlyphLevel(51); q('#glyph-save').click();
+      checkGlyph('board00', 2477896, 1); checkGlyph('board01', 2477896, 51);
+      checkRadius(${startingSocket}, 3, 'rare'); checkRadius(${castleSocket}, 5, 'legendary');
+      window.castleInstance = ${castleSocket}.dataset.boardInstanceId;
+      manage('board01').click(); action('data-rotation-step="90"').click();
+    `);
+    await evaluate(`check(save().boards[1].rotation === 90 && ${castleSocket}.dataset.boardInstanceId === castleInstance,
+        'Rotation preserves the socket identity'); q('#board-management-close').click();
+      checkGlyph('board01', 2477896, 51); checkRadius(${castleSocket}, 5, 'legendary');
+      q('#allocation-reset').click(); checkGlyph('board00', 2477896, 1); checkGlyph('board01', 2477896, 51); checkRadius(${startingSocket}, 3, 'rare');
+      q('#zoom-reset').click(); center();`);
+    await screenshot("glyph-desktop-multiple-radii");
+    await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 740, deviceScaleFactor: 1, mobile: true });
+    await evaluate("q('#zoom-reset').click(); center();");
+    await screenshot("glyph-mobile-multiple-radii");
+    await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1050, deviceScaleFactor: 1, mobile: false });
+    await reload();
+    await installGlyphChecks();
+    await evaluate(`checkRadius(${startingSocket}, 3, 'rare'); checkRadius(${castleSocket}, 5, 'legendary'); manage('board01').click();`);
+    acceptConfirmation = true;
+    await click("action('data-remove-board')");
+    await until(() => evaluate("!gate('board01',120)"));
+    await evaluate(`checkGlyph('board00', 2477896, 1);
+      attach('board00',10).click(); option('board01').click();
+      check(!glyphFor('board01') && !${castleSocket}.querySelector('.glyph-emblem'), 'Reattaching creates a fresh glyph socket');
+      const bad = save(); bad.boards[1].glyph = {snoId:2479231,level:1};
+      localStorage.setItem(${JSON.stringify(v2)}, JSON.stringify(bad));`);
+    const invalidGlyphDraft = await evaluate("raw()");
+    await reload();
+    await installGlyphChecks();
+    await evaluate(`
+      check(q('#allocation-message').textContent.includes('Invalid or obsolete glyph data') && !${castleSocket}.querySelector('.glyph-emblem'),
+        'Malformed glyph warning preserves the loaded board');
+      check(${startingSocket}.querySelector('.glyph-emblem'), 'A valid assignment survives a malformed neighbor');
+    `);
+    assert.equal(await evaluate("raw()"), invalidGlyphDraft);
+    await evaluate(`
+      ${startingSocket}.click(); q('#glyph-level').value = '2';
+      localStorage.setItem(${JSON.stringify(v2)}, JSON.stringify({...save(), otherTab: true}));
+      q('#glyph-save').click(); check(glyphPicker().open && q('#glyph-feedback').textContent.includes('changed'),
+        'A concurrent save conflict rejects the glyph edit');
+      check(${startingSocket}.getAttribute('aria-label').includes('level 1') && save().otherTab, 'Live and saved state remain intact');
+    `);
+    await send("Page.navigate", { url: base + "?inspect=1" });
+    await until(() => evaluate("document.querySelector('#board-selector option:last-child')?.disabled === false"));
+    await evaluate(`(() => {
+      const savedSingle = localStorage.getItem(${JSON.stringify(single)});
+      const q = selector => document.querySelector(selector);
+      q('.node[data-node-index="136"]').click();
+      if (q('#glyph-session-note').hidden) throw new Error('Inspector explains session-only edits');
+      q('#glyph-save').click();
+      if (!q('.node[data-node-index="136"] .glyph-emblem') || localStorage.getItem(${JSON.stringify(single)}) !== savedSingle) {
+        throw new Error('Inspector glyphs preserve independent storage');
+      }
+    })()`);
+  });
+  await t.test("an allocated Canny socket applies and explains the 22-Intelligence Primary", async () => {
+    const indices = [304,303,282,281,260,239,240,219,198,177,178,157,136,137,116,95,96,135,134,179];
+    const draft = { version: 2, sourceRevision: revision, boards: [{
+      instanceId: "board00", boardId: "board00", placementIndex: 0, rotation: 0, incoming: null,
+      allocatedSourceIndices: indices, glyph: { snoId: 1029487, level: 150 }
+    }] };
+    await evaluate(`localStorage.setItem(${JSON.stringify(v2)}, ${JSON.stringify(JSON.stringify(draft))});`);
+    await send("Page.navigate", { url: base });
+    await ready();
+    await evaluate(`
+      window.cannyRow = () => q('[data-stat-key="raw:nonPhysicalDamage"]');
+      window.cannyValue = () => cannyRow()?.querySelector('strong').textContent;
+      window.socket = () => gate('board00',136);
+      check(cannyValue() === '+53.0%', 'Active socket is counted once in Total Stats');
+      check(q('#glyph-calculation-list').textContent.includes('22 purchased Intelligence'), 'Advanced diagnostics show the local pool');
+      check(tip(gate('board00',96)).includes('Canny Primary · +16.9%') && q('#node-tooltip').textContent.includes('+7'),
+        'Magic node tooltip shows its glyph and native contributions separately');
+      cannyRow().scrollIntoView({block:'nearest',container:'nearest'}); cannyRow().focus({preventScroll:true});
+      check(qa('.node--stat-highlight').length === 4, 'Only the four local contributors highlight');
+      cannyRow().blur(); tip(gate('board00',96));
+    `);
+    await evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    await screenshot("glyph-primary-desktop-node-and-total");
+    await evaluate(`socket().click();
+      check(q('#glyph-picker .glyph-primary-result').textContent.includes('Applied Primary') && q('#glyph-picker .glyph-primary-result').textContent.includes('+53.0%'),
+        'Socket panel shows the applied total');
+      check(q('.glyph-legendary-status').textContent === 'Available by progression', 'Legendary description retains progression status');`);
+    await screenshot("glyph-primary-desktop-socket");
+    await evaluate(`q('#glyph-picker-close').click();
+      gate('board00',179).dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+      check(cannyValue() === '+41.0%', 'Refunding a contributor updates the aggregate');
+      gate('board00',179).click(); check(cannyValue() === '+53.0%', 'Repurchasing restores the contribution');
+      socket().click(); q('#glyph-options [data-glyph-sno-id="2073373"]').click(); q('#glyph-save').click();
+      check(!cannyRow() && q('#glyph-calculation-list').textContent.includes('Challenger'), 'Replacing Canny clears its category and shows amplification');`);
+    await evaluate(`localStorage.setItem(${JSON.stringify(v2)}, ${JSON.stringify(JSON.stringify(draft))});`);
+    await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 740, deviceScaleFactor: 1, mobile: true });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    await reload();
+    await evaluate(`q('[data-stat-key="raw:nonPhysicalDamage"]').scrollIntoView({block:'nearest',container:'nearest'}); tip(gate('board00',96));`);
+    await evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    await screenshot("glyph-primary-mobile-node-and-total");
+    await tap("gate('board00',136)");
+    await evaluate(`check(q('#glyph-picker .glyph-primary-result').textContent.includes('+53.0%'), 'Mobile shows the restored socket total');
+      q('#glyph-picker .glyph-primary-result').scrollIntoView({block:'nearest',container:'nearest'});`);
+    await screenshot("glyph-primary-mobile-socket");
+    await evaluate(`q('#glyph-remove').click();
+      check(!q('[data-stat-key="raw:nonPhysicalDamage"]') && !save().boards[0].glyph, 'Removing the glyph clears its calculated and saved state');`);
+  });
+  await t.test("Normal, Magic and Rare amplification on desktop and touch layouts", async () => {
+    await evaluate(`(async () => {
+      const { createStartingLayout, attachBoard, writeConnectedSaveV2 } = await import('./connected-boards.js');
+      const { mergeSharedNodeDefinitions } = await import('./shared-node-definitions.js');
+      const resources = new Map();
+      for (const suffix of ['00','01','02']) {
+        const board = await (await fetch('../paladin-board-' + suffix + '.json')).json();
+        const file = suffix === '00' ? 'node-data.json' : 'node-data-' + suffix + '.json';
+        const database = mergeSharedNodeDefinitions(await (await fetch(file)).json());
+        resources.set('board' + suffix, { board, database });
+      }
+      const start = createStartingLayout(resources);
+      const castle = attachBoard(resources, start, new Set([start.root]), 'board00:10', 'board01', 'castle');
+      const layout = attachBoard(resources, castle, new Set([start.root]), 'castle:230', 'board02', 'shield');
+      const parents = new Map([[layout.root, null]]);
+      const queue = [layout.root];
+      for (let cursor = 0; cursor < queue.length; cursor++) {
+        const id = queue[cursor];
+        for (const neighbor of layout.graph.get(id)) {
+          if (parents.has(neighbor)) continue;
+          parents.set(neighbor, id);
+          queue.push(neighbor);
+        }
+      }
+      const allocated = new Set([layout.root]);
+      for (const target of ['board00:93','board00:133','board00:136','board00:139','board00:156','board00:157',
+        'board00:159','board00:177','castle:78','castle:120','shield:261','shield:264']) {
+        check(parents.has(target), 'Amplification fixture cell is reachable');
+        for (let id = target; !allocated.has(id); id = parents.get(id)) allocated.add(id);
+      }
+      const glyphs = new Map([['board00',{snoId:2073373,level:31}],['castle',{snoId:2478548,level:1}],['shield',{snoId:2506253,level:1}]]);
+      localStorage.setItem(${JSON.stringify(v2)}, JSON.stringify(writeConnectedSaveV2(layout, allocated, glyphs)));
+    })()`);
+    const painted = () => evaluate("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+    const views = [[1440, 1050, false, "desktop"], [390, 740, true, "mobile"]];
+    const samples = [
+      ["normal", "board00", 157, 136, "44.3% Normal", "Strength", "core:Strength"],
+      ["magic", "board01", 78, 120, "30.0% Magic", "Intelligence", "core:Intelligence"],
+      ["rare", "board02", 261, 264, "25.0% Rare", "Thorns", "raw:thorns"]
+    ];
+    for (const [width, height, mobile, viewport] of views) {
+      await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
+      await send("Emulation.setTouchEmulationEnabled", { enabled: mobile });
+      await reload();
+      for (const [rarity, board, index, socket, heading, attribute, stat] of samples) {
+        const node = `gate('${board}',${index})`;
+        const socketNode = `gate('${board}',${socket})`;
+        await evaluate(`(() => { center(); const nodeTip = tip(${node});
+          check(${node}.classList.contains('node--amplified') && nodeTip.includes('Glyph amplification') && nodeTip.includes('Effective'),
+            'Highlighted purchased node distinguishes its native and amplified values');
+          check(q('[data-stat-key="${stat}"]').textContent.includes('${attribute}'), 'Updated stat appears in Total Stats');
+          q('[data-stat-key="${stat}"]').scrollIntoView({block:'nearest',container:'nearest'});
+          if ('${rarity}' === 'rare') check(nodeTip.includes('Conditional amplification unresolved'), 'Rare tooltip identifies provisional conditional policy'); })()`);
+        await painted();
+        if (mobile) await evaluate(`check(q('#node-tooltip').getBoundingClientRect().top > q('.zoom-controls').getBoundingClientRect().bottom,
+          'Amplified node tooltip clears the mobile zoom buttons')`);
+        await screenshot(`glyph-amplification-${viewport}-${rarity}-node`);
+        await evaluate(`(() => {
+          const detail = tip(${socketNode});
+          check(detail.includes('${heading}') && detail.includes('${attribute}'), 'Socket tooltip shows magnitude, target and aggregate');
+          if ('${rarity}' === 'normal') check(detail.includes('Additional') && detail.includes('satisfied'), 'Challenger Additional requirement is satisfied');
+          ${socketNode}.click();
+          check(q('#glyph-picker .glyph-socket-summary').textContent.includes('${attribute}'), 'Picker shows socket totals');
+          q('#glyph-picker .glyph-additional-progress').scrollIntoView({block:'end',container:'nearest'});
+        })()`);
+        await painted();
+        await screenshot(`glyph-amplification-${viewport}-${rarity}-socket`);
+        await evaluate("q('#glyph-picker-close').click()");
+        if (rarity === "rare") {
+          await evaluate(`${socketNode}.blur();
+            ${socketNode}.dispatchEvent(new PointerEvent('pointerleave'));
+            q('[data-stat-key="raw:thorns"]').scrollIntoView({block:'nearest',container:'nearest'});
+            check(q('[data-stat-key="raw:thorns"] strong').textContent === '+437.5', 'Effective Thorns includes the amplified base once');`);
+          await painted();
+          await screenshot(`glyph-amplification-${viewport}-total-stats`);
+        }
+      }
+      await evaluate(`q('.advanced-details').open = true;
+        q('#glyph-calculation-list details').open = true;
+        check(q('#glyph-calculation-list').textContent.includes('0.44255')
+          && q('#glyph-calculation-list').textContent.includes('Active conditional')
+          && q('#amplification-global-details').textContent.includes('Exact global threshold inputs'), 'Diagnostics preserve exact component and global values');
+        q('#glyph-calculation-details').scrollIntoView({block:'start'});`);
+      await painted();
+      await screenshot(`glyph-amplification-${viewport}-advanced`);
+    }
+  });
   assert.deepEqual(errors, []);
 });

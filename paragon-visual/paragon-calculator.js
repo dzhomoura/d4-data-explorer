@@ -11,6 +11,8 @@ import {
   SHIELD_BEARER_BONUS_REGISTRY
 } from "./paragon-bonus-registry.js";
 import { resolvePlacedRareThreshold } from "./paragon-thresholds.js";
+import { evaluatePrimaryGlyph } from "./glyph-primary.js";
+import { evaluateAmplificationAdditional, evaluateAmplificationGlyph } from "./glyph-amplification.js";
 
 const FORMULA_SOURCE_PATH = "json/base/meta/GameBalance/AttributeFormulas.gam.json";
 const VERIFIED_FORMULAS_BY_REVISION = new Map([
@@ -53,6 +55,15 @@ const BOARD_BONUS_REGISTRIES = Object.freeze({
   [ENDURE_BONUS_REGISTRY.boardSnoId]: ENDURE_BONUS_REGISTRY,
   [BEACON_BONUS_REGISTRY.boardSnoId]: BEACON_BONUS_REGISTRY
 });
+// Pinned attributes.json operators for all typed node lines on the ten Paladin boards.
+const NODE_OPERATORS = new Map([
+  ...[9, 10, 11, 12, 65, 79, 142, 161, 208, 221, 252, 254, 288, 331, 373, 482, 649,
+    736, 747, 748, 953, 959, 984, 1123, 1207].map(id => [id, 0]),
+  [237, 6], [335, 6]
+]);
+const FLAT_NODE_ATTRIBUTES = new Set([9, 10, 11, 12, 161, 373, 649]);
+const CORE_WRITER_IDS = new Set([9, 10, 11, 12, 18, 19, 20, 21]);
+
 const ZERO_EXTERNAL_ATTRIBUTES = Object.freeze({
   Strength: 0,
   Intelligence: 0,
@@ -265,6 +276,24 @@ export function calculateParagonBonuses(
   externalAttributeInput = ZERO_EXTERNAL_ATTRIBUTES,
   calculationContext = {}
 ) {
+  return calculateParagonBoards([{
+    board, nodeDatabase, allocatedNodeIndices, calculationContext
+  }], externalAttributeInput).results[0];
+}
+
+export function calculateParagonBoards(boards, externalAttributeInput) {
+  const externalAttributes = normalizeExternalAttributes(externalAttributeInput);
+  // All boards resolve their effective base core before any threshold is evaluated.
+  const plans = boards.map(prepareParagonBoard);
+  const coreAttributes = Object.fromEntries(ATTRIBUTE_NAMES.map(name =>
+    [name, plans.reduce((sum, plan) => sum + plan.coreAttributes[name], 0)]));
+  const totalAttributes = Object.fromEntries(ATTRIBUTE_NAMES.map(name =>
+    [name, externalAttributes[name] + coreAttributes[name]]));
+  const results = plans.map(plan => plan.finish(externalAttributes, totalAttributes));
+  return { results, coreAttributes, totalAttributes, externalAttributes };
+}
+
+function prepareParagonBoard({ board, nodeDatabase, allocatedNodeIndices, calculationContext }) {
   const width = Number(board?.nWidth);
   if (!Number.isInteger(width) || width < 1 || !Array.isArray(board.arEntries) || board.arEntries.length < width * width) {
     throw new Error("Calculation requires a valid board width and complete entry grid.");
@@ -284,7 +313,6 @@ export function calculateParagonBonuses(
     throw new Error("Node database contains duplicate definitions.");
   }
 
-  const externalAttributes = normalizeExternalAttributes(externalAttributeInput);
   const candidateRegistry = BOARD_BONUS_REGISTRIES[board.__snoID__] || null;
   const usesPlacement = Object.hasOwn(calculationContext, "placementIndex");
   const placementIndex = usesPlacement ? calculationContext.placementIndex : undefined;
@@ -319,10 +347,8 @@ export function calculateParagonBonuses(
     Dexterity: 0
   };
   const bonusCategories = BONUS_CATEGORIES.concat(candidateRegistry?.additionalBonusCategories || []);
-  const bonusTotals = createBonusTotals(bonusCategories);
   const verifiedDetails = [];
   const registeredAttributesByNode = new Map();
-  const thresholdResultsByAttribute = new Map();
   const unresolvedByBonus = new Map();
 
   function addUnresolved(nodeIndex, definition, attribute, attributeIndex, reason, conditional, formulaUnresolved = true) {
@@ -379,6 +405,10 @@ export function calculateParagonBonuses(
       const attribute = definition.attributes[attributeIndex];
       const formulaReference = attribute.formulaReference || null;
       const registered = getRegisteredAttribute(nodeRecord, attribute, attributeIndex);
+      const conditionalCore = (CORE_WRITER_IDS.has(attribute.id) || registered?.record.category === "coreAttribute")
+        && (definition.ptBonusAttributeIndices?.includes(attributeIndex)
+          || (registered && registered.record.conditional !== 0));
+      if (conditionalCore) throw new Error("Thresholds do not support conditional core attribute gains.");
       if (registered?.invalid) {
         addUnresolved(index, definition, attribute, attributeIndex, "Observed bonus registry does not match the node attribute identity.", false);
         continue;
@@ -391,18 +421,12 @@ export function calculateParagonBonuses(
           addUnresolved(index, definition, attribute, attributeIndex, "Observed bonus registry contains an invalid value or category.", record.conditional > 0);
           continue;
         }
-        registeredAttributes.set(attributeIndex, record);
         if (record.category === "coreAttribute") {
           const resultAttribute = CORE_ATTRIBUTES[attribute.name];
           if (!resultAttribute) {
             addUnresolved(index, definition, attribute, attributeIndex, "Registered core attribute does not map to a supported total.", false);
             continue;
           }
-          coreAttributes[resultAttribute] += record.base;
-        } else {
-          bonusTotals[record.category].unconditional += record.base;
-        }
-        if (record.category === "coreAttribute") {
           verifiedDetails.push({
             nodeIndex: index,
             nodeName: definition.name,
@@ -412,6 +436,7 @@ export function calculateParagonBonuses(
             provenance: record.provenance
           });
         }
+        registeredAttributes.set(attributeIndex, record);
         continue;
       }
 
@@ -439,7 +464,6 @@ export function calculateParagonBonuses(
         continue;
       }
 
-      coreAttributes[resultAttribute] += verifiedValue;
       verifiedDetails.push({
         nodeIndex: index,
         nodeName: definition.name,
@@ -451,35 +475,8 @@ export function calculateParagonBonuses(
     }
   }
 
-  function getTotalAttributes() {
-    return Object.fromEntries(ATTRIBUTE_NAMES.map((name) => [name, externalAttributes[name] + coreAttributes[name]]));
-  }
-
-  let totalAttributes = getTotalAttributes();
-  for (const index of allocatedNodeIndices) {
-    const entry = board.arEntries[index];
-    const definition = definitions.get(entry.name);
-    const nodeRecord = getRegistryNode(definition, boardRegistry);
-    const registeredAttributes = registeredAttributesByNode.get(index);
-    for (const [attributeIndex, record] of registeredAttributes) {
-      if (record.conditional === 0) continue;
-      const threshold = evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry, placementIndex);
-      thresholdResultsByAttribute.set(`${index}:${attributeIndex}`, threshold);
-      if (!threshold.resolved) {
-        addUnresolved(index, definition, definition.attributes[attributeIndex], attributeIndex, threshold.reason, true, false);
-        continue;
-      }
-      if (!threshold.satisfied) continue;
-      if (record.category === "coreAttribute") {
-        const resultAttribute = CORE_ATTRIBUTES[definition.attributes[attributeIndex].name];
-        coreAttributes[resultAttribute] += record.conditional;
-      } else {
-        bonusTotals[record.category].conditional += record.conditional;
-      }
-    }
-  }
-  totalAttributes = getTotalAttributes();
-
+  const instanceId = calculationContext.instanceId ?? board.__snoID__;
+  const connected = calculationContext.placementIndex !== undefined;
   const nodeEvaluations = [];
   for (let index = 0; index < width * width; index += 1) {
     const entry = board.arEntries[index];
@@ -499,7 +496,8 @@ export function calculateParagonBonuses(
         && attribute.formulaValue === verifiedValue
         && attribute.verifiedBonus === verifiedValue;
       const resultAttribute = CORE_ATTRIBUTES[attribute.name];
-      let record = registered && !registered.invalid ? registered.record : null;
+      const record = isAllocated ? registeredAttributesByNode.get(index).get(attributeIndex)
+        : registered && !registered.invalid ? registered.record : null;
       let unconditional = null;
       let conditional = candidateRegistry?.unverifiedRareThresholds
         && definition.ptBonusAttributeIndices?.includes(attributeIndex) ? null : 0;
@@ -514,31 +512,31 @@ export function calculateParagonBonuses(
         provenance = "verified-game-formula";
       }
 
-      let threshold = null;
-      if (record && (record.conditional === null || record.conditional > 0)) {
-        threshold = thresholdResultsByAttribute.get(`${index}:${attributeIndex}`)
-          || evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry, placementIndex);
-        thresholdEvaluations.push(threshold);
-      }
       attributeEvaluations.push({
         attributeIndex,
         attributeId: attribute.id,
+        attributeParam: attribute.param,
+        units: FLAT_NODE_ATTRIBUTES.has(attribute.id) ? "flat" : "percentage-points",
+        aggregationOperator: NODE_OPERATORS.get(attribute.id) ?? null,
         attributeName: attribute.name,
         formulaReference,
         category: record?.category || (resultAttribute ? "coreAttribute" : null),
         unconditional,
         conditional,
         thresholdReference: record?.thresholdReference || null,
-        conditionalApplied: Boolean(isAllocated && threshold?.resolved && threshold.satisfied),
-        threshold,
+        conditionalApplied: false,
+        threshold: null,
         provenance,
         unresolved: unconditional === null
       });
     }
 
     nodeEvaluations.push({
+      instanceId,
       nodeIndex: index,
+      ...(connected && { nodeId: `${instanceId}:${index}` }),
       nodeName: definition.name,
+      kind: definition.kind,
       displayName: nodeRecord?.displayName || definition.displayName || null,
       snoId: definition.snoId,
       allocated: isAllocated,
@@ -548,39 +546,120 @@ export function calculateParagonBonuses(
     });
   }
 
-  for (const category of bonusCategories) {
-    const totals = bonusTotals[category];
-    totals.total = totals.unconditional + totals.conditional;
+  const glyphInput = { board, instanceId, sourceRevision: nodeDatabase.source.commit,
+    configuration: calculationContext.glyph, nodeEvaluations };
+  const amplification = evaluateAmplificationGlyph(glyphInput);
+  const amplifiedLines = new Map((amplification?.contributions ?? []).map(line =>
+    [`${line.sourceIndex}:${line.attributeIndex}`, line]));
+  const conditionalPending = new Set(amplification?.affectedNodeIndices);
+  const nodesByIndex = new Map(nodeEvaluations.map(node => [node.nodeIndex, node]));
+  const effectiveNodeContributions = [];
+  for (const node of nodeEvaluations) {
+    if (!node.allocated) continue;
+    const definition = definitions.get(node.nodeName);
+    for (const attribute of node.attributes) {
+      const hasPendingConditional = conditionalPending.has(node.nodeIndex)
+        && node.ptBonusAttributeIndices.includes(attribute.attributeIndex);
+      if (hasPendingConditional) attribute.conditionalAmplificationStatus = "unresolved";
+      if (!Number.isFinite(attribute.unconditional)) continue;
+      const amplified = amplifiedLines.get(`${node.nodeIndex}:${attribute.attributeIndex}`);
+      const baseAmplificationDelta = amplified?.baseAmplificationDelta ?? 0;
+      const line = {
+        instanceId, sourceIndex: node.nodeIndex, nodeSnoId: node.snoId, sourcePath: definition.sourcePath,
+        attributeIndex: attribute.attributeIndex, attributeId: attribute.attributeId, attributeParam: attribute.attributeParam,
+        attributeName: attribute.attributeName, units: attribute.units, aggregationOperator: attribute.aggregationOperator,
+        category: attribute.category, nativeBase: attribute.unconditional, baseAmplificationDelta,
+        effectiveBase: amplified?.effectiveBase ?? attribute.unconditional,
+        nativeConditional: attribute.conditional, activeNativeConditional: 0,
+        conditionalAmplificationDelta: hasPendingConditional ? null : 0,
+        ...(hasPendingConditional && { conditionalAmplificationStatus: "unresolved" }),
+        thresholdReference: attribute.thresholdReference, provenance: attribute.provenance,
+        ...(amplified && { glyphSnoId: amplification.glyphSnoId, level: amplification.level,
+          amplificationFraction: amplification.fraction, evidence: amplification.evidence })
+      };
+      if (amplified) attribute.amplification = line;
+      if (line.category === "coreAttribute") coreAttributes[CORE_ATTRIBUTES[line.attributeName]] += line.effectiveBase;
+      effectiveNodeContributions.push(line);
+    }
   }
 
-  const unresolvedBonuses = [...unresolvedByBonus.values()];
-  const unresolvedFormulaReferences = unresolvedBonuses.filter((bonus) => bonus.formulaUnresolved);
-  const conditionalBonuses = nodeEvaluations.flatMap((node) => (node.allocated ? node.attributes : [])
-    .filter((attribute) => attribute.conditional > 0)
-    .map((attribute) => ({
-      nodeIndex: node.nodeIndex,
-      nodeName: node.nodeName,
-      attributeName: attribute.attributeName,
-      conditionalValue: attribute.conditional,
-      threshold: attribute.threshold,
-      applied: attribute.conditionalApplied
-    })));
-  const totalCoreAttributes = Object.values(coreAttributes).reduce((total, value) => total + value, 0);
+  function finish(externalAttributes, totalAttributes) {
+    // Rare requirements read the same global snapshot, regardless of board or cell order.
+    for (const node of nodeEvaluations) {
+      const definition = definitions.get(node.nodeName);
+      const nodeRecord = getRegistryNode(definition, boardRegistry);
+      for (const attribute of node.attributes) {
+        const registered = node.allocated ? registeredAttributesByNode.get(node.nodeIndex).get(attribute.attributeIndex)
+          : getRegisteredAttribute(nodeRecord, definition.attributes[attribute.attributeIndex], attribute.attributeIndex);
+        const record = node.allocated ? registered : registered && !registered.invalid ? registered.record : null;
+        if (!record || record.conditional === 0) continue;
+        const threshold = evaluateThreshold(definition, nodeRecord, record, totalAttributes, boardRegistry, placementIndex);
+        attribute.threshold = threshold;
+        attribute.conditionalApplied = Boolean(node.allocated && threshold.resolved && threshold.satisfied);
+        node.thresholds.push(threshold);
+        if (node.allocated && !threshold.resolved) {
+          addUnresolved(node.nodeIndex, definition, definition.attributes[attribute.attributeIndex],
+            attribute.attributeIndex, threshold.reason, true, false);
+        }
+      }
+    }
 
-  return {
-    sourceRevision: nodeDatabase.source.commit,
-    allocatedNodeCount: allocatedNodeIndices.size,
-    externalAttributes,
-    totalAttributes,
-    nodeEvaluations,
-    verifiedParagonBonuses: {
-      coreAttributes,
-      totalCoreAttributes,
-      rawBonuses: bonusTotals,
-      details: verifiedDetails
-    },
-    unresolvedFormulaReferences,
-    conditionalBonuses,
-    unresolvedBonusCount: unresolvedBonuses.length
-  };
+    const bonusTotals = createBonusTotals(bonusCategories);
+    for (const line of effectiveNodeContributions) {
+      const attribute = nodesByIndex.get(line.sourceIndex).attributes[line.attributeIndex];
+      if (attribute.conditionalApplied) line.activeNativeConditional = line.nativeConditional;
+      line.effectiveAmount = line.effectiveBase + line.activeNativeConditional;
+      if (line.category === "coreAttribute") continue;
+      const totals = bonusTotals[line.category];
+      totals.unconditional += line.nativeBase;
+      totals.conditional += line.activeNativeConditional;
+      if (line.baseAmplificationDelta) totals.amplification = (totals.amplification ?? 0) + line.baseAmplificationDelta;
+    }
+
+    for (const totals of Object.values(bonusTotals)) {
+      totals.total = totals.unconditional + totals.conditional + (totals.amplification ?? 0);
+    }
+
+    const conversion = calculationContext.glyph && evaluatePrimaryGlyph(glyphInput);
+    if (conversion?.status === "active" && conversion.percentagePoints) {
+      const totals = bonusTotals[conversion.category] ??= { unconditional: 0, conditional: 0, total: 0 };
+      totals.glyph = conversion.percentagePoints;
+      totals.total += totals.glyph;
+    }
+    const glyph = amplification ?? conversion;
+    if (amplification?.status === "active") {
+      amplification.additional = evaluateAmplificationAdditional(amplification, board, nodeEvaluations);
+    }
+    const unresolvedBonuses = [...unresolvedByBonus.values()];
+    const conditionalBonuses = nodeEvaluations.flatMap(node => (node.allocated ? node.attributes : [])
+      .filter(attribute => attribute.conditional > 0)
+      .map(attribute => ({
+        nodeIndex: node.nodeIndex,
+        nodeName: node.nodeName,
+        attributeName: attribute.attributeName,
+        conditionalValue: attribute.conditional,
+        threshold: attribute.threshold,
+        applied: attribute.conditionalApplied
+      })));
+    return {
+      sourceRevision: nodeDatabase.source.commit,
+      allocatedNodeCount: allocatedNodeIndices.size,
+      externalAttributes,
+      totalAttributes,
+      nodeEvaluations,
+      effectiveNodeContributions,
+      ...((glyph?.status === "active" || glyph?.status === "unresolved") && { glyphEvaluations: [glyph] }),
+      verifiedParagonBonuses: {
+        coreAttributes,
+        totalCoreAttributes: Object.values(coreAttributes).reduce((sum, amount) => sum + amount, 0),
+        rawBonuses: bonusTotals,
+        details: verifiedDetails
+      },
+      unresolvedFormulaReferences: unresolvedBonuses.filter(bonus => bonus.formulaUnresolved),
+      conditionalBonuses,
+      unresolvedBonusCount: unresolvedBonuses.length
+    };
+  }
+
+  return { coreAttributes, finish };
 }

@@ -1,5 +1,6 @@
 import { BOARD_ROTATIONS, rotateBoardPoint } from "./board-rotation.js";
-import { calculateParagonBonuses } from "./paragon-calculator.js";
+import { calculateParagonBoards } from "./paragon-calculator.js";
+import { getGlyphSocketSourceIndex, isGlyphConfiguration } from "./paladin-glyph-catalogue.js";
 import { BOARD_SNO_IDS } from "./shared-node-definitions.js";
 
 const SOURCE_REVISION = "75e619f0d90a0951945747f45feef59c076a5db0";
@@ -14,7 +15,6 @@ const DIRECTIONS = {
   South: { x: 0, y: 1, opposite: "North" },
   West: { x: -1, y: 0, opposite: "East" }
 };
-const ATTRIBUTES = ["Strength", "Intelligence", "Willpower", "Dexterity"];
 
 export const CONNECTED_SAVE_KEY = "d4-paragon-paladin-connected-v1";
 export const CONNECTED_SAVE_KEY_V2 = "d4-paragon-paladin-connected-v2";
@@ -318,6 +318,29 @@ export function planConnectedBoardReset(layout, allocated, instanceId) {
   return { candidate, refunded: allocated.size - candidate.size, dependentBoards };
 }
 
+function hasGlyphSocket(layout, instanceId) {
+  const board = layout.boards.find(instance => instance.instanceId === instanceId);
+  if (!board) return false;
+  const index = getGlyphSocketSourceIndex(board.board);
+  return index !== null && layout.nodes.get(nodeId(instanceId, index))?.definition.hasSocket === true;
+}
+
+export function configureConnectedGlyph(layout, glyphs, instanceId, configuration) {
+  if (!hasGlyphSocket(layout, instanceId)) throw new Error("Choose an equipped board with a glyph socket.");
+  if (configuration !== null && !isGlyphConfiguration(configuration)) {
+    throw new Error("Choose a Paladin glyph and a valid planner level.");
+  }
+  const next = new Map(glyphs);
+  if (configuration === null) next.delete(instanceId);
+  else next.set(instanceId, { snoId: configuration.snoId, level: configuration.level });
+  return next;
+}
+
+export function retainConnectedGlyphs(layout, glyphs) {
+  return new Map(layout.boards.filter(board => glyphs.has(board.instanceId))
+    .map(board => [board.instanceId, glyphs.get(board.instanceId)]));
+}
+
 export function readConnectedSave(resources, saved) {
   if (saved?.version !== 1 || saved.sourceRevision !== SOURCE_REVISION || !Array.isArray(saved.allocations)) {
     throw new Error("The Connected Boards save has an unsupported schema or source revision.");
@@ -359,7 +382,10 @@ export function readConnectedSaveV2(resources, saved) {
   }
   const layout = buildBoardInstanceLayout(resources, saved.boards);
   const allocated = new Set();
-  for (const { instanceId, allocatedSourceIndices } of saved.boards) {
+  const glyphs = new Map();
+  const invalidGlyphBoards = [];
+  for (const board of saved.boards) {
+    const { instanceId, allocatedSourceIndices, glyph } = board;
     if (!Array.isArray(allocatedSourceIndices)) throw new Error("Invalid saved board allocations.");
     for (const sourceIndex of allocatedSourceIndices) {
       const id = nodeId(instanceId, sourceIndex);
@@ -368,13 +394,25 @@ export function readConnectedSaveV2(resources, saved) {
       }
       allocated.add(id);
     }
+    if (Object.hasOwn(board, "glyph")) {
+      if (isGlyphConfiguration(glyph) && hasGlyphSocket(layout, instanceId)) {
+        glyphs.set(instanceId, { snoId: glyph.snoId, level: glyph.level });
+      } else {
+        invalidGlyphBoards.push(instanceId);
+      }
+    }
   }
   validateConnectedAllocation(layout, allocated);
-  return { layout, allocated };
+  return { layout, allocated, glyphs, invalidGlyphBoards };
 }
 
-export function writeConnectedSaveV2(layout, allocated) {
+export function writeConnectedSaveV2(layout, allocated, glyphs = new Map()) {
   validateConnectedAllocation(layout, allocated);
+  for (const [instanceId, configuration] of glyphs) {
+    if (!hasGlyphSocket(layout, instanceId) || !isGlyphConfiguration(configuration)) {
+      throw new Error("Invalid glyph configuration in the connected draft.");
+    }
+  }
   const indices = new Map(layout.boards.map(({ instanceId }) => [instanceId, []]));
   for (const id of allocated) {
     const { instanceId, sourceIndex } = layout.nodes.get(id);
@@ -387,7 +425,10 @@ export function writeConnectedSaveV2(layout, allocated) {
       parentGateIndex: incoming.parentGateIndex,
       entryGateIndex: incoming.entryGateIndex
     },
-    allocatedSourceIndices: indices.get(instanceId).sort((first, second) => first - second)
+    allocatedSourceIndices: indices.get(instanceId).sort((first, second) => first - second),
+    ...(glyphs.has(instanceId) && {
+      glyph: { snoId: glyphs.get(instanceId).snoId, level: glyphs.get(instanceId).level }
+    })
   }));
   return { version: 2, sourceRevision: SOURCE_REVISION, boards };
 }
@@ -398,7 +439,7 @@ function isPrototypeLayout({ boards }) {
     && boards[1].boardId === CASTLE_BOARD_ID && boards[1].placementIndex === 1;
 }
 
-export function calculateConnectedBonuses(layout, allocated, externalAttributes) {
+export function calculateConnectedBonuses(layout, allocated, externalAttributes, glyphs = new Map()) {
   validateConnectedAllocation(layout, allocated);
   const indices = new Map(layout.boards.map(({ instanceId }) => [instanceId, new Set()]));
   for (const id of allocated) {
@@ -406,44 +447,34 @@ export function calculateConnectedBonuses(layout, allocated, externalAttributes)
     indices.get(node.instanceId).add(node.sourceIndex);
   }
 
-  const evaluate = (board, external) => calculateParagonBonuses(
-    board.board, board.database, indices.get(board.instanceId), external, { placementIndex: board.placementIndex }
+  const { results, coreAttributes, totalAttributes, externalAttributes: normalizedExternal } = calculateParagonBoards(
+    layout.boards.map(board => ({
+      board: board.board, nodeDatabase: board.database, allocatedNodeIndices: indices.get(board.instanceId),
+      calculationContext: { placementIndex: board.placementIndex, instanceId: board.instanceId, glyph: glyphs.get(board.instanceId) }
+    })),
+    externalAttributes
   );
-  const initial = layout.boards.map(board => evaluate(board));
-  // The supported boards have unconditional core gains. Reject a dependency
-  // this two-pass wrapper cannot evaluate if their evidence changes.
-  for (const result of initial) {
-    if (result.nodeEvaluations.some(node => node.allocated && node.attributes.some(attribute =>
-      attribute.category === "coreAttribute" && attribute.conditional !== 0
-    ))) {
-      throw new Error("Connected thresholds do not support conditional core attribute gains.");
-    }
-  }
-  const coreAttributes = Object.fromEntries(ATTRIBUTES.map(name => [
-    name, initial.reduce((sum, result) => sum + result.verifiedParagonBonuses.coreAttributes[name], 0)
-  ]));
-  const totalAttributes = Object.fromEntries(ATTRIBUTES.map(name => [name, externalAttributes[name] + coreAttributes[name]]));
   const rawBonuses = {};
-  const nodeEvaluations = [];
-  let unresolvedBonusCount = 0;
-  for (const [index, board] of layout.boards.entries()) {
-    const external = Object.fromEntries(ATTRIBUTES.map(name => [
-      name, externalAttributes[name] + (coreAttributes[name] - initial[index].verifiedParagonBonuses.coreAttributes[name])
-    ]));
-    const result = evaluate(board, external);
-    unresolvedBonusCount += result.unresolvedBonusCount;
-    for (const node of result.nodeEvaluations) {
-      nodeEvaluations.push({ ...node, nodeId: nodeId(board.instanceId, node.nodeIndex) });
-    }
+  for (const result of results) {
     for (const [category, totals] of Object.entries(result.verifiedParagonBonuses.rawBonuses)) {
       const combined = rawBonuses[category] ??= { unconditional: 0, conditional: 0, total: 0 };
       combined.unconditional += totals.unconditional;
       combined.conditional += totals.conditional;
-      combined.total = combined.unconditional + combined.conditional;
+      if (totals.glyph !== undefined) combined.glyph = (combined.glyph ?? 0) + totals.glyph;
+      if (totals.amplification !== undefined) combined.amplification = (combined.amplification ?? 0) + totals.amplification;
+      combined.total = combined.unconditional + combined.conditional + (combined.amplification ?? 0) + (combined.glyph ?? 0);
     }
   }
+
+  const glyphEvaluations = results.flatMap(result => result.glyphEvaluations ?? []);
+  const effectiveNodeContributions = results.flatMap(result => result.effectiveNodeContributions);
+  const amplifiedCore = effectiveNodeContributions.some(line => line.category === "coreAttribute" && line.baseAmplificationDelta);
   return {
-    totalAttributes, nodeEvaluations, unresolvedBonusCount,
+    externalAttributes: normalizedExternal, totalAttributes, effectiveNodeContributions,
+    nodeEvaluations: results.flatMap(result => result.nodeEvaluations),
+    unresolvedBonusCount: results.reduce((sum, result) => sum + result.unresolvedBonusCount, 0),
+    ...(glyphEvaluations.length > 0 && { glyphEvaluations }),
+    ...(amplifiedCore && { amplifiedThresholdEvidence: "source-derived-cross-board-model" }),
     verifiedParagonBonuses: {
       coreAttributes, rawBonuses,
       totalCoreAttributes: Object.values(coreAttributes).reduce((sum, value) => sum + value, 0)

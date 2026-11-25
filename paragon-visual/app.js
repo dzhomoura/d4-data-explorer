@@ -1,9 +1,15 @@
 import { calculateParagonBonuses } from "./paragon-calculator.js";
 import { mergeSharedNodeDefinitions } from "./shared-node-definitions.js";
 import { BOARD_ROTATIONS, getBoardControlPositions, rotateBoardPoint } from "./board-rotation.js";
+import { getPaladinGlyph } from "./paladin-glyph-catalogue.js";
+import { getGlyphProgression } from "./glyph-progression.js";
+import { createGlyphEmblem, createGlyphPicker, describeAmplificationRequirement, describePrimaryGlyph, formatAmplifiedCore, formatGlyphPrimary } from "./glyph-picker.js";
+import { evaluatePrimaryGlyph } from "./glyph-primary.js";
+import { evaluateAmplificationAdditional, evaluateAmplificationGlyph } from "./glyph-amplification.js";
 import {
   attachBoard, calculateConnectedBonuses, CONNECTED_SAVE_KEY, CONNECTED_SAVE_KEY_V2, createStartingLayout, MAX_BOARDS,
-  planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, removeConnectedBoard, rotateConnectedBoard, writeConnectedSaveV2
+  configureConnectedGlyph, planConnectedBoardReset, readConnectedSave, readConnectedSaveV2, removeConnectedBoard,
+  retainConnectedGlyphs, rotateConnectedBoard, writeConnectedSaveV2
 } from "./connected-boards.js";
 
 (() => {
@@ -157,6 +163,12 @@ import {
   const boardPickerDescription = document.getElementById("board-picker-description");
   const boardPickerError = document.getElementById("board-picker-error");
   const boardManagement = document.getElementById("board-management");
+  const glyphDialog = document.getElementById("glyph-picker");
+  const glyphCalculationDetails = document.getElementById("glyph-calculation-details");
+  const glyphCalculationList = document.getElementById("glyph-calculation-list");
+  const amplificationGlobalDetails = document.getElementById("amplification-global-details");
+  const showGlyphRadii = document.getElementById("show-glyph-radii");
+  const glyphPicker = createGlyphPicker(glyphDialog, showBoardDialog);
   const managementActions = document.getElementById("board-management-actions");
   const managementFeedback = document.getElementById("board-management-feedback");
   const connectedHeaders = document.getElementById("connected-board-headers");
@@ -420,6 +432,7 @@ import {
   let boardGrid = null;
   let boardCells = [];
   let connectionLayer = null;
+  let glyphRadiusLayer = null;
   let allocatedConnectionLayer = null;
   let boardIdentity = null;
   let currentBoardDefinition = null;
@@ -433,6 +446,9 @@ import {
   const allocationsByBoard = new Map();
   let connectedLayout = null;
   let connectedAllocation = null;
+  let connectedGlyphs = new Map();
+  const inspectorGlyphs = new Map();
+  let invalidGlyphBoards = [];
   let connectedSaveReadError = null;
   let storedConnectedDraft = null;
   let boardPickerGate = null;
@@ -551,8 +567,16 @@ import {
             "tooltip-bonus tooltip-bonus--verified",
             `${basePrefix}: ${formatBonusValue(calculation.unconditional, calculation.category)} ${valueLabel}`
           );
+          if (calculation.amplification) {
+            const { baseAmplificationDelta, effectiveAmount } = calculation.amplification;
+            const category = calculation.category === "coreAttribute" ? "core" : calculation.category;
+            addText(row, "p", "glyph-primary-result", `Glyph amplification ${formatRawBonusValue(baseAmplificationDelta, category)} · Effective ${formatRawBonusValue(effectiveAmount, category)} ${valueLabel}`);
+          }
+          if (calculation.conditionalAmplificationStatus) {
+            addText(row, "p", "tooltip-formula-note", "Conditional amplification unresolved · native conditional value used.");
+          }
           if (calculation.conditional === null) {
-            addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", calculation.threshold.reason);
+            addText(row, "p", "tooltip-bonus tooltip-bonus--unresolved", calculation.threshold?.reason ?? "Conditional amount unresolved.");
           } else if (calculation.conditional > 0) {
             addText(
               row,
@@ -563,8 +587,8 @@ import {
             const threshold = calculation.threshold;
             if (threshold?.resolved) {
               const requirementProgress = threshold.requirements
-                ? threshold.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue} / ${requirement.requiredValue}`).join("; ")
-                : `${threshold.requiredAttribute} ${threshold.currentValue} / ${threshold.requiredValue}`;
+                ? threshold.requirements.map((requirement) => `${requirement.requiredAttribute} ${formatAmplifiedCore(requirement.currentValue)} / ${requirement.requiredValue}`).join("; ")
+                : `${threshold.requiredAttribute} ${formatAmplifiedCore(threshold.currentValue)} / ${threshold.requiredValue}`;
               const thresholdText = `${requirementProgress} · ${threshold.satisfied ? "satisfied" : "not satisfied"}`;
               addText(row, "p", `tooltip-threshold-progress${threshold.satisfied ? " tooltip-threshold-progress--met" : ""}`, thresholdText);
               if (!nodeEvaluation.allocated && threshold.satisfied) {
@@ -586,7 +610,7 @@ import {
                   : calculation.provenance === "formula-derived"
                     ? "Pinned formula derived from observed shared multiplier"
                     : "Unspecified evidence source";
-            addText(row, "p", "tooltip-evidence", `${evidenceLabel}; glyph amplification is not applied here.`);
+            addText(row, "p", "tooltip-evidence", `Native value · ${evidenceLabel}`);
           }
         } else if (attribute.verifiedBonus !== null) {
           const value = Number(attribute.verifiedBonus);
@@ -623,8 +647,8 @@ import {
           || null;
         const label = evaluation?.resolved
           ? evaluation.requirements
-            ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${requirement.currentValue}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
-            : `${threshold.name}: ${evaluation.requiredAttribute} ${evaluation.currentValue}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
+            ? `${threshold.name}: ${evaluation.requirements.map((requirement) => `${requirement.requiredAttribute} ${formatAmplifiedCore(requirement.currentValue)}/${requirement.requiredValue}`).join("; ")} · ${evaluation.satisfied ? "met" : "not met"}`
+            : `${threshold.name}: ${evaluation.requiredAttribute} ${formatAmplifiedCore(evaluation.currentValue)}/${evaluation.requiredValue} · ${evaluation.satisfied ? "met" : "not met"}`
           : evaluation || config.unverifiedRareThresholds
             ? `${threshold.name}: unresolved${unresolvedFormula ? ` · ${unresolvedFormula}` : ""}`
             : `${threshold.name}: not evaluated`;
@@ -657,7 +681,31 @@ import {
     if (definition.passivePower) {
       addText(tooltip, "p", "tooltip-trait", `Legendary power: ${definition.passivePower.name} (effect unresolved)`);
     }
-    if (definition.hasSocket) addText(tooltip, "p", "tooltip-trait", "Glyph socket");
+    if (definition.hasSocket) {
+      const configuration = getSocketGlyph(node);
+      const progression = configuration && getGlyphProgression(configuration.level);
+      const detail = progression
+        ? `${getPaladinGlyph(configuration.snoId).displayName} · Level ${progression.level} · Radius ${progression.radius} · ${progression.rarity}`
+        : "Empty glyph socket";
+      addText(tooltip, "p", "tooltip-trait", `${detail}. Open to manage.`);
+    }
+    for (const primary of currentCalculation?.glyphEvaluations ?? []) {
+      if (primary.instanceId !== (node.instanceId ?? boardKey)) continue;
+      if (nodeEvaluation?.nodeIndex === primary.socketSourceIndex) {
+        addText(tooltip, "p", "glyph-primary-result", describePrimaryGlyph(primary));
+        if (primary.kind === "amplification" && primary.status === "active") {
+          const summary = primary.deltasByAttribute.map(line => describeSocketDelta(line)).join(" · ");
+          if (summary) addText(tooltip, "p", "glyph-primary-result", summary);
+          if (primary.additional) addText(tooltip, "p", "glyph-primary-result", describeAmplificationRequirement(primary.additional));
+        }
+      }
+      if (primary.kind === "amplification") continue;
+      const contribution = primary.contributions?.find(entry => entry.nodeId === id);
+      if (contribution) {
+        const amount = formatGlyphPrimary(contribution.percentagePoints, primary.destination);
+        addText(tooltip, "p", "glyph-primary-result", `${primary.glyphName} Primary · ${amount} ${primary.label}`);
+      }
+    }
     if (definition.isGate) {
       const direction = node.marker.dataset.gateDirection;
       addText(tooltip, "p", "tooltip-trait", direction ? `Board gate · ${direction}` : "Board gate");
@@ -672,12 +720,13 @@ import {
     const stageRect = stage.getBoundingClientRect();
     const tooltipRect = tooltip.getBoundingClientRect();
     const margin = 10;
+    const topMargin = Number.parseFloat(getComputedStyle(stage).getPropertyValue("--tooltip-top-margin"));
     let left = markerRect.left - stageRect.left + markerRect.width / 2 - tooltipRect.width / 2;
     let top = markerRect.top - stageRect.top - tooltipRect.height - margin;
 
     left = Math.max(margin, Math.min(left, stage.clientWidth - tooltipRect.width - margin));
-    if (top < margin) top = markerRect.bottom - stageRect.top + margin;
-    top = Math.max(margin, Math.min(top, stage.clientHeight - tooltipRect.height - margin));
+    if (top < topMargin) top = markerRect.bottom - stageRect.top + margin;
+    top = Math.max(topMargin, Math.min(top, stage.clientHeight - tooltipRect.height - margin));
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
   }
@@ -971,19 +1020,21 @@ import {
     });
     frame.replaceChildren(grid, ...outlines);
     renderConnectedHeaders(boards);
+    renderGlyphRadii();
     renderConnections(connectionLayer, boardNodes);
     setStatus(`${CONNECTED_CONFIG.label} · ${boards.length}/${MAX_BOARDS} equipped`);
     updateAllocationDisplay();
   }
 
-  function writeConnectedDraft(allocations = connectedAllocation) {
+  function writeConnectedDraft(allocations = connectedAllocation, glyphs = connectedGlyphs) {
     if (connectedSaveReadError) throw new Error("The existing connected save could not be read and was preserved.");
     if (window.localStorage.getItem(CONNECTED_SAVE_KEY_V2) !== storedConnectedDraft) {
       throw new Error("The stored connected draft changed. Reload before saving again.");
     }
-    const serialized = JSON.stringify(writeConnectedSaveV2(connectedLayout, allocations));
+    const serialized = JSON.stringify(writeConnectedSaveV2(connectedLayout, allocations, glyphs));
     window.localStorage.setItem(CONNECTED_SAVE_KEY_V2, serialized);
     storedConnectedDraft = serialized;
+    invalidGlyphBoards = [];
   }
 
   function openConnectedMode() {
@@ -998,6 +1049,8 @@ import {
         if (restored) {
           connectedLayout = restored.layout;
           connectedAllocation = restored.allocated;
+          connectedGlyphs = restored.glyphs ?? new Map();
+          invalidGlyphBoards = restored.invalidGlyphBoards ?? [];
           migrated = legacy !== null;
         }
       } catch (error) {
@@ -1023,6 +1076,11 @@ import {
     }
     setSaveStatus(storedConnectedDraft !== null ? "Connected draft restored" : "Separate connected draft",
       storedConnectedDraft !== null ? "saved" : "unsaved");
+    if (invalidGlyphBoards.length) {
+      const names = new Intl.ListFormat("en").format(invalidGlyphBoards.map(boardName));
+      setAllocationMessage(`Restored the board draft. Invalid or obsolete glyph data was ignored on ${names}.`, true);
+      return;
+    }
     setAllocationMessage(connectedLayout.boards.length < MAX_BOARDS
       ? "Use + beside a free gate to attach a board." : "All five board positions are equipped.");
   }
@@ -1048,6 +1106,7 @@ import {
     panY += ((before.y - after.y) + (layout.height - connectedLayout.height) / 2) * CELL_SIZE * zoom;
     connectedLayout = layout;
     connectedAllocation = allocatedNodeIds;
+    connectedGlyphs = retainConnectedGlyphs(layout, connectedGlyphs);
     connectedBoardError.hidden = true;
     renderConnectedLayout();
     if (fit) {
@@ -1106,6 +1165,73 @@ import {
     }
     showBoardDialog(boardPicker, 360);
     boardPickerOptions.querySelector("button:enabled")?.focus({ preventScroll: true });
+  }
+
+  function getSocketGlyph(node) {
+    return node.instanceId ? connectedGlyphs.get(node.instanceId) : inspectorGlyphs.get(currentBoardKey);
+  }
+
+  function renderSocketGlyph(node, allocationState) {
+    const configuration = getSocketGlyph(node);
+    const glyph = getPaladinGlyph(configuration?.snoId);
+    node.marker.classList.toggle("node--occupied-socket", Boolean(glyph));
+    node.marker.replaceChildren(...(glyph ? [createGlyphEmblem(glyph)] : []));
+    const board = BOARD_CONFIGS[node.boardId ?? currentBoardKey].label;
+    const detail = glyph ? `${glyph.displayName}, level ${configuration.level}` : "empty";
+    node.marker.setAttribute("aria-label", `${board}, glyph socket, ${detail}, ${allocationState}`);
+  }
+
+  function socketAllocationState(id, eligible) {
+    return allocatedNodeIds.has(id) ? "allocated" : eligible ? "eligible to allocate" : "outside the allocated path";
+  }
+
+  function openGlyphPicker(node) {
+    const persistent = Boolean(node.instanceId);
+    const boardKey = node.boardId ?? currentBoardKey;
+    glyphPicker.open({
+      boardName: BOARD_CONFIGS[boardKey].label.split(" — ")[1],
+      configuration: getSocketGlyph(node),
+      allocated: allocatedNodeIds.has(node.id),
+      eligible: getEligibleNodeIds().has(node.id),
+      persistent,
+      evaluatePrimary(configuration) {
+        const board = boardResources.get(boardKey);
+        const input = {
+          board: board.board, instanceId: node.instanceId ?? boardKey, sourceRevision: board.database.source.commit,
+          configuration, nodeEvaluations: currentCalculation.nodeEvaluations
+        };
+        const amplification = evaluateAmplificationGlyph(input);
+        if (!amplification) return evaluatePrimaryGlyph(input);
+        return { ...amplification, additional: evaluateAmplificationAdditional(amplification, input.board, input.nodeEvaluations) };
+      },
+      describeSocketDelta,
+      onAllocate() {
+        allocateNode(node.id);
+        return allocatedNodeIds.has(node.id);
+      },
+      onSave(configuration) {
+        if (persistent) {
+          const next = configureConnectedGlyph(connectedLayout, connectedGlyphs, node.instanceId, configuration);
+          writeConnectedDraft(connectedAllocation, next);
+          connectedGlyphs = next;
+          setSaveStatus("Connected draft saved locally", "saved");
+        } else if (configuration) {
+          inspectorGlyphs.set(boardKey, configuration);
+        } else {
+          inspectorGlyphs.delete(boardKey);
+        }
+        renderSocketGlyph(node, socketAllocationState(node.id, getEligibleNodeIds().has(node.id)));
+        renderGlyphRadii();
+        updateParagonCalculation();
+        setAllocationMessage(configuration
+          ? `${getPaladinGlyph(configuration.snoId).displayName} saved at planner level ${configuration.level}.`
+          : "Glyph removed.");
+      },
+      onClose() {
+        node.marker.focus({ preventScroll: true });
+        if (!node.marker.matches(":focus-visible")) hideTooltip();
+      }
+    });
   }
 
   function managementButton(instanceId) {
@@ -1203,10 +1329,9 @@ import {
     grid.setAttribute("aria-label", label);
     grid.style.gridTemplateColumns = `repeat(${width}, var(--cell-size))`;
 
-    function makeLayer(allocated) {
+    function makeLayer(className) {
       const layer = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      layer.classList.add("board-connections");
-      if (allocated) layer.classList.add("board-connections--allocated");
+      layer.setAttribute("class", className);
       layer.setAttribute("width", String(boardPixelWidth));
       layer.setAttribute("height", String(boardPixelHeight));
       layer.setAttribute("viewBox", `0 0 ${boardPixelWidth} ${boardPixelHeight}`);
@@ -1215,8 +1340,9 @@ import {
       return layer;
     }
 
-    connectionLayer = makeLayer(false);
-    allocatedConnectionLayer = makeLayer(true);
+    glyphRadiusLayer = makeLayer("glyph-radius-layer");
+    connectionLayer = makeLayer("board-connections");
+    allocatedConnectionLayer = makeLayer("board-connections board-connections--allocated");
     return grid;
   }
 
@@ -1239,14 +1365,16 @@ import {
     if (node.gateDirection) marker.dataset.gateDirection = node.gateDirection;
     marker.setAttribute("role", "button");
     marker.setAttribute("aria-describedby", tooltip.id);
-    marker.setAttribute("aria-pressed", "false");
+    if (definition.hasSocket) marker.setAttribute("aria-haspopup", "dialog");
+    else marker.setAttribute("aria-pressed", "false");
     marker.setAttribute("aria-keyshortcuts", "Enter Space Delete");
     marker.tabIndex = 0;
     node.marker = marker;
     cell.setAttribute("aria-label", definition.name);
+    const activate = definition.hasSocket ? () => openGlyphPicker(node) : () => allocateNode(id);
     marker.addEventListener("click", event => {
       event.stopPropagation();
-      if (event.button === 0) allocateNode(id);
+      if (event.button === 0) activate();
     });
     marker.addEventListener("contextmenu", event => {
       event.preventDefault();
@@ -1258,7 +1386,7 @@ import {
       event.preventDefault();
       event.stopPropagation();
       if (event.key === "Delete") refundNode(id);
-      else allocateNode(id);
+      else activate();
     });
     marker.addEventListener("pointerenter", () => showTooltip(node));
     marker.addEventListener("pointerleave", () => {
@@ -1291,8 +1419,33 @@ import {
     boardGrid.append(...cells);
     focusedMarker?.focus({ preventScroll: true });
     rotationSelect.value = String(boardRotation);
+    renderGlyphRadii();
     renderConnections(connectionLayer, boardNodes);
   }
+
+  function renderGlyphRadii() {
+    glyphRadiusLayer?.replaceChildren();
+    if (!glyphRadiusLayer || !showGlyphRadii.checked) return;
+    for (const node of boardNodes.values()) {
+      if (!node.definition.hasSocket) continue;
+      const configuration = getSocketGlyph(node);
+      if (!configuration) continue;
+      const { radius, rarity } = getGlyphProgression(configuration.level);
+      const centerX = (node.displayPosition.x + 0.5) * CELL_SIZE;
+      const centerY = (node.displayPosition.y + 0.5) * CELL_SIZE;
+      // Place the outline between the last included and first excluded grid centers.
+      const reach = (radius + 0.5) * CELL_SIZE;
+      const diamond = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      diamond.setAttribute("points", `${centerX},${centerY - reach} ${centerX + reach},${centerY} ${centerX},${centerY + reach} ${centerX - reach},${centerY}`);
+      diamond.dataset.boardInstanceId = node.instanceId ?? currentBoardKey;
+      diamond.dataset.socketSourceIndex = node.sourceIndex ?? node.id;
+      diamond.dataset.radius = radius;
+      diamond.dataset.rarity = rarity.toLowerCase();
+      glyphRadiusLayer.append(diamond);
+    }
+  }
+
+  showGlyphRadii.addEventListener("change", renderGlyphRadii);
 
   function renderConnections(layer, nodeIds) {
     layer.replaceChildren();
@@ -1653,6 +1806,10 @@ import {
       const isEligible = eligibleNodeIds.has(id);
       node.marker.classList.toggle("node--allocated", isAllocated);
       node.marker.classList.toggle("node--eligible", isEligible);
+      if (node.definition.hasSocket) {
+        renderSocketGlyph(node, socketAllocationState(id, isEligible));
+        continue;
+      }
       node.marker.setAttribute("aria-pressed", String(isAllocated));
       const state = isAllocated ? "allocated" : isEligible ? "eligible to allocate" : "not connected to the allocated path";
       const boardLabel = node.boardId ? `${BOARD_CONFIGS[node.boardId].label}, ` : "";
@@ -1668,24 +1825,24 @@ import {
   function updateParagonCalculation() {
     if (!isConnectedMode() && (!currentBoardDefinition || !currentNodeDatabase)) return;
     const result = isConnectedMode()
-      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes)
+      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes, connectedGlyphs)
       : calculateParagonBonuses(
         currentBoardDefinition,
         currentNodeDatabase,
         allocatedNodeIds,
         externalAttributes,
-        { boardEquipIndex: currentBoardConfig.boardEquipIndex }
+        { boardEquipIndex: currentBoardConfig.boardEquipIndex, instanceId: currentBoardKey, glyph: inspectorGlyphs.get(currentBoardKey) }
       );
     currentCalculation = result;
     const attributes = result.verifiedParagonBonuses.coreAttributes;
-    strengthTotal.textContent = `+${attributes.Strength}`;
-    intelligenceTotal.textContent = `+${attributes.Intelligence}`;
-    willpowerTotal.textContent = `+${attributes.Willpower}`;
-    dexterityTotal.textContent = `+${attributes.Dexterity}`;
-    coreAttributeTotal.textContent = `+${result.verifiedParagonBonuses.totalCoreAttributes}`;
+    strengthTotal.textContent = `+${formatAmplifiedCore(attributes.Strength)}`;
+    intelligenceTotal.textContent = `+${formatAmplifiedCore(attributes.Intelligence)}`;
+    willpowerTotal.textContent = `+${formatAmplifiedCore(attributes.Willpower)}`;
+    dexterityTotal.textContent = `+${formatAmplifiedCore(attributes.Dexterity)}`;
+    coreAttributeTotal.textContent = `+${formatAmplifiedCore(result.verifiedParagonBonuses.totalCoreAttributes)}`;
     unresolvedBonusCount.textContent = String(result.unresolvedBonusCount);
     for (const [name, value] of Object.entries(result.totalAttributes)) {
-      totalAttributeDisplays[name].textContent = String(value);
+      totalAttributeDisplays[name].textContent = String(formatAmplifiedCore(value));
     }
 
     const categories = result.verifiedParagonBonuses.rawBonuses;
@@ -1700,7 +1857,35 @@ import {
       displays.conditional.textContent = unresolvedConditionals.has(category)
         ? "Unresolved"
         : formatRawBonusValue(totals.conditional, category);
-      displays.total.textContent = formatRawBonusValue(totals.total, category);
+      displays.total.textContent = formatRawBonusValue(totals.unconditional + totals.conditional + (totals.amplification ?? 0), category);
+    }
+    const evaluations = result.glyphEvaluations ?? [];
+    glyphCalculationList.replaceChildren();
+    glyphCalculationDetails.hidden = evaluations.length === 0;
+    const activeAmplification = evaluations.some(primary => primary.kind === "amplification" && primary.status === "active");
+    amplificationGlobalDetails.hidden = !activeAmplification;
+    if (activeAmplification) {
+      const exact = Object.entries(result.totalAttributes).map(([name, value]) => `${name} ${value}`).join(" · ");
+      amplificationGlobalDetails.textContent = `Exact global threshold inputs · ${exact}. Integer core displays are provisional.`;
+    }
+    const amplifiedNodes = new Set();
+    for (const primary of evaluations) {
+      const name = isConnectedMode() ? boardName(primary.instanceId) : currentBoardConfig.label.split(" — ")[1];
+      const item = addText(glyphCalculationList, "li", "", `${name} · ${primary.glyphName} level ${primary.level}`);
+      const evidence = primary.evidence === "source-derived-extrapolation" ? "Source-derived extrapolation"
+        : primary.evidence === "experimentally-supported-amplification" ? "Experimentally supported"
+          : "Calibrated with in-game observations";
+      addText(item, "p", "glyph-primary-result", `${describePrimaryGlyph(primary)} · ${evidence}`);
+      if (primary.kind === "amplification" && primary.status === "active") {
+        renderAmplificationDetails(item, primary, result.effectiveNodeContributions);
+        for (const line of primary.contributions) amplifiedNodes.add(line.nodeId);
+      }
+    }
+    for (const [id, node] of boardNodes) {
+      const amplified = amplifiedNodes.has(id);
+      node.marker.classList.toggle("node--amplified", amplified);
+      if (amplified) node.marker.setAttribute("aria-description", "Glyph-amplified");
+      else node.marker.removeAttribute("aria-description");
     }
     renderTotalStats(result);
 
@@ -1711,13 +1896,52 @@ import {
     }
   }
 
+  function describeSocketDelta(line, precise = false) {
+    const core = line.units === "flat" && line.category === "coreAttribute";
+    const value = precise ? line.delta : core ? formatAmplifiedCore(line.delta) : Number(line.delta.toFixed(2));
+    const label = core ? attributeLabel(line.attributeName) : RAW_BONUS_LABELS[line.category] || attributeLabel(line.attributeName);
+    return `+${value}${line.units === "percentage-points" ? "%" : ""} ${label}`;
+  }
+
+  function renderAmplificationDetails(item, primary, effectiveLines) {
+    const { additional, glyphSnoId, instanceId } = primary;
+    addText(item, "p", "", `Amplification fraction ${primary.fraction} · ${primary.percentagePoints}%`);
+    if (primary.deltasByAttribute.length) {
+      addText(item, "p", "", primary.deltasByAttribute.map(line => describeSocketDelta(line, true)).join(" · "));
+    }
+    if (additional) {
+      addText(item, "p", "glyph-primary-result", describeAmplificationRequirement(additional));
+      for (const requirement of additional.requirements) {
+        addText(item, "p", "", `${attributeLabel(requirement.attribute.name)} · Native ${requirement.native} · Effective ${requirement.effective} · Required ${requirement.required ?? "unresolved"}`);
+      }
+    }
+    if (primary.conditionalAmplificationPending) {
+      addText(item, "p", "", "Rare conditional amplification unresolved. Active conditional bonuses keep their native values.");
+    }
+    if (primary.unresolvedLines.length) {
+      addText(item, "p", "", `${primary.unresolvedLines.length} eligible lines have unresolved native values.`);
+    }
+    const lines = effectiveLines.filter(line => line.instanceId === instanceId && line.glyphSnoId === glyphSnoId);
+    if (lines.length) {
+      const breakdown = document.createElement("details");
+      item.appendChild(breakdown);
+      addText(breakdown, "summary", "", "Exact node contributions");
+      const list = document.createElement("ul");
+      breakdown.appendChild(list);
+      for (const line of lines) {
+        const unit = line.units === "percentage-points" ? "%" : "";
+        addText(list, "li", "", `Cell ${line.sourceIndex} · ${attributeLabel(line.attributeName)} [${line.attributeId}/${line.attributeParam}] · Native ${line.nativeBase}${unit} · Glyph +${line.baseAmplificationDelta}${unit} · Active conditional ${line.activeNativeConditional}${unit} · Effective ${line.effectiveAmount}${unit}`);
+      }
+    }
+  }
+
   function formatPercentValue(value) {
     const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
     return `${value >= 0 ? "+" : ""}${rounded}%`;
   }
 
   function formatRawBonusValue(value, category) {
-    if (FLAT_BONUS_CATEGORIES.has(category)) {
+    if (category === "core" || FLAT_BONUS_CATEGORIES.has(category)) {
       const rounded = Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
       return `${value >= 0 ? "+" : ""}${rounded}`;
     }
@@ -1749,6 +1973,7 @@ import {
 
   function renderTotalStats(result) {
     const contributors = new Map();
+    const glyphDestinations = new Map();
     for (const node of result.nodeEvaluations) {
       if (!node.allocated) continue;
       for (const attribute of node.attributes) {
@@ -1764,16 +1989,27 @@ import {
         }
       }
     }
+    for (const primary of result.glyphEvaluations ?? []) {
+      if (primary.status !== "active" || primary.kind === "amplification") continue;
+      glyphDestinations.set(primary.category, primary);
+      for (const { nodeId } of primary.contributions) {
+        addStatContribution(contributors, `raw:${primary.category}`, nodeId, false);
+      }
+    }
     statContributors = new Map([...contributors].map(([key, nodes]) => [key, [...nodes.values()]]));
     clearStatHighlights();
 
     const entries = [];
     for (const [attributeName, amount] of Object.entries(result.verifiedParagonBonuses.coreAttributes)) {
-      if (amount !== 0) entries.push({ key: `core:${attributeName}`, label: attributeName, value: amount, flat: true });
+      if (amount !== 0) entries.push({ key: `core:${attributeName}`, label: attributeName, value: formatAmplifiedCore(amount), flat: true });
     }
     for (const [category, totals] of Object.entries(result.verifiedParagonBonuses.rawBonuses)) {
       if (totals.total !== 0) {
-        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || category, value: totals.total, flat: FLAT_BONUS_CATEGORIES.has(category) });
+        const primary = glyphDestinations.get(category);
+        const glyphOnlyDisplay = primary && totals.unconditional + totals.conditional + (totals.amplification ?? 0) === 0
+          ? formatGlyphPrimary(totals.total, primary.destination) : null;
+        entries.push({ key: `raw:${category}`, label: RAW_BONUS_LABELS[category] || primary?.label || category,
+          value: totals.total, flat: FLAT_BONUS_CATEGORIES.has(category), glyphOnlyDisplay });
       }
     }
     totalStatsList.replaceChildren();
@@ -1783,11 +2019,12 @@ import {
       button.type = "button";
       button.className = "total-stats-item";
       button.dataset.statKey = entry.key;
-      button.setAttribute("aria-label", `${entry.value >= 0 ? "+" : ""}${entry.value}${entry.flat ? "" : "%"} ${entry.label}; highlight contributing nodes`);
+      const accessibleValue = entry.glyphOnlyDisplay ?? `${entry.value >= 0 ? "+" : ""}${entry.value}${entry.flat ? "" : "%"}`;
+      button.setAttribute("aria-label", `${accessibleValue} ${entry.label}; highlight contributing nodes`);
       const label = document.createElement("span");
       label.textContent = entry.label;
       const value = document.createElement("strong");
-      value.textContent = `${entry.value >= 0 ? "+" : ""}${Number.isInteger(entry.value) ? entry.value : Number(entry.value.toFixed(2))}${entry.flat ? "" : "%"}`;
+      value.textContent = entry.glyphOnlyDisplay ?? `${entry.value >= 0 ? "+" : ""}${Number.isInteger(entry.value) ? entry.value : Number(entry.value.toFixed(2))}${entry.flat ? "" : "%"}`;
       button.append(label, value);
       button.addEventListener("pointerenter", () => highlightStatContributors(entry.key));
       button.addEventListener("pointerleave", clearStatHighlights);
@@ -1896,7 +2133,8 @@ import {
     }
   });
   document.getElementById("board-picker-close").addEventListener("click", () => boardPicker.close());
-  for (const dialog of [boardPicker, boardManagement]) {
+  const boardDialogs = [boardPicker, boardManagement, glyphDialog];
+  for (const dialog of boardDialogs) {
     dialog.addEventListener("click", event => {
       if (event.target === dialog) dialog.close();
     });
@@ -2063,10 +2301,10 @@ import {
   });
   window.addEventListener("resize", () => {
     if (activeTooltipMarker) positionTooltip(activeTooltipMarker);
-    for (const dialog of [boardPicker, boardManagement]) if (dialog.open) positionBoardDialog(dialog);
+    for (const dialog of boardDialogs) if (dialog.open) positionBoardDialog(dialog);
   });
   window.addEventListener("scroll", () => {
-    for (const dialog of [boardPicker, boardManagement]) if (dialog.open) positionBoardDialog(dialog);
+    for (const dialog of boardDialogs) if (dialog.open) positionBoardDialog(dialog);
   });
 
   async function loadBoardResource(boardKey) {

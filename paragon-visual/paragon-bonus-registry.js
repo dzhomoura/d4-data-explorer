@@ -3,6 +3,24 @@ const FORMULA_DERIVED = "formula-derived";
 const UNAMPLIFIED_PLANNER = "unamplified-planner";
 const NO_GLYPH_AMPLIFICATION = false;
 
+// Keys preserve the authored attribute ID and parameter, including signed data-attribute keys.
+export const PRIMARY_GLYPH_DESTINATIONS = Object.freeze({
+  "-2147483454:-1": ["arbiterWingStrikeDamage", "Arbiter Wing Strike Damage"],
+  "254:0": ["physicalDamage", "Physical Damage"],
+  "256:-1": ["nonPhysicalDamage", "Non-Physical Damage"],
+  "259:-387701": ["discipleSkillDamage", "Disciple Skill Damage"],
+  "259:-394636083": ["zealotSkillDamage", "Zealot Skill Damage"],
+  "259:-1250119683": ["judicatorSkillDamage", "Judicator Skill Damage"],
+  "259:-1936853670": ["juggernautSkillDamage", "Juggernaut Skill Damage"],
+  "288:-1": ["criticalStrikeDamage", "Critical Strike Damage"],
+  "736:-1": ["vulnerableDamage", "Vulnerable Damage"],
+  "748:-1": ["damageWhileFortified", "Damage while Fortified"],
+  "959:-1": ["damageToCrowdControlled", "Damage to Crowd Controlled"],
+  "984:2263340": ["judgementDamage", "Judgement Damage"],
+  "1105:-1": ["damageToClose", "Damage to Close Enemies"],
+  "1123:-1": ["damageWhileHealthy", "Damage while Healthy"]
+});
+
 export const PARAGON_BONUS_REGISTRY = {
   sourceRevision: "75e619f0d90a0951945747f45feef59c076a5db0",
   boardSnoId: 2436481,
