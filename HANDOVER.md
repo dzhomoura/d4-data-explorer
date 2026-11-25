@@ -58,6 +58,8 @@ The workspace header keeps point and node counts, save status, reset, and intera
 
 Node tooltips use localized names or verified bonus labels, rarity styling, and concise allocation and effect states. Rare cards separate effective base bonuses from the threshold bonus and show each requirement's progress. Legendary and glyph cards distinguish scenario outcomes and locked or unpurchased effects. The **Node Details** button or **I** on a focused node opens the full player summary and technical evidence, including exact source and calculation records. [Chapter IV Stage 2 implementation and screenshots](research/paladin-ui-chapter-4-stage-2.md)
 
+Glyph management uses a searchable alphabetical catalogue and a configuration pane with a numeric level, slider, and progression presets. Drafts run through the normal calculator with a temporary glyph assignment, so the dialog can show in-radius contributions, passive states, and Rare grant changes across boards. Cancel, Close, and Escape discard glyph edits. Save or Replace applies them while Allocate Socket and Remove Glyph retain their explicit actions. The board, Total Stats, and diagnostics display the applied build throughout preview. [Chapter IV Stage 3 implementation and screenshots](research/paladin-ui-chapter-4-stage-3.md)
+
 ### Board 00
 
 - 75 occupied cells and 17 definitions.
@@ -535,6 +537,8 @@ Chapter III, Stage 1B passed all 59 tests with headless Chrome and zero skips, i
 Chapter IV, Stage 1 passed all 61 tests with headless Chrome and zero skips. The checks include real Fullscreen API entry and exit, an exit initiated outside the workspace toggle, mobile fallback, camera and Fit behavior, and board and glyph interactions with the workspace expanded. The same allocation, save, and calculation regressions passed. Physical Escape in native fullscreen, browser-level exit controls, and physical mobile browser chrome still require manual verification. [Stage 1 verification and reviewed captures](research/paladin-ui-chapter-4-stage-1.md#screenshot-review)
 
 Chapter IV, Stage 2 passed all 63 tests with headless Chrome and zero skips. The original 61 tests passed alongside new coverage for player-facing naming, threshold and Legendary states, diagnostic access, rotation, and viewport edges. Twelve desktop and emulated mobile screenshots were reviewed. [Stage 2 verification and reviewed captures](research/paladin-ui-chapter-4-stage-2.md#reviewed-screenshots)
+
+Chapter IV, Stage 3 passed all 64 tests with headless Chrome and zero skips. The original 63 checks and the new draft workflow cover glyph selection and progression, native and fallback fullscreen, unchanged live state during preview, a cross-board Rare grant, and a single confirmed write with exact committed calculation parity. Five screenshots cover the catalogue, progression, effect states, and responsive editor. [Stage 3 verification and reviewed captures](research/paladin-ui-chapter-4-stage-3.md#reviewed-screenshots)
 
 ## Current boundary
 

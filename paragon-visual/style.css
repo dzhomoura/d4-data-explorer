@@ -557,7 +557,10 @@ html.workspace-scroll-locked {
 }
 
 .glyph-picker-panel {
-  width: min(100%, 660px);
+  width: min(100%, 920px);
+  height: min(100%, 740px);
+  padding: 14px;
+  background: linear-gradient(145deg, #251d16, #141013 74%);
 }
 
 .glyph-socket-actions,
@@ -565,32 +568,42 @@ html.workspace-scroll-locked {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  color: #d2bd99;
+  gap: 6px 9px;
+  color: #dfc9a4;
 }
 
 .glyph-socket-actions {
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 9px;
 }
 
 .glyph-picker-content {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(0, 1.65fr);
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 2fr);
   gap: 12px;
   min-height: 0;
+  flex: 1 1 auto;
 }
 
 .glyph-browser,
 .glyph-preview {
   min-height: 0;
   min-width: 0;
+  border: 1px solid #604936;
+  border-radius: 3px;
+  padding: 11px;
+  background: #141114;
 }
 
 .glyph-browser {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+}
+
+.glyph-browser > label {
+  color: #f0d9b1;
+  font-weight: 600;
 }
 
 .glyph-picker input {
@@ -598,7 +611,7 @@ html.workspace-scroll-locked {
   border: 1px solid #775837;
   border-radius: 3px;
   padding: 6px 8px;
-  background: #151315;
+  background: #19151a;
   color: #f4e3ba;
   font: inherit;
 }
@@ -613,7 +626,7 @@ html.workspace-scroll-locked {
   align-content: start;
   gap: 4px;
   min-height: 0;
-  max-height: 330px;
+  flex: 1 1 auto;
   overflow: auto;
   overscroll-behavior: contain;
   margin: 0;
@@ -624,29 +637,43 @@ html.workspace-scroll-locked {
 #glyph-options button {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   width: 100%;
+  min-height: 37px;
   text-align: left;
 }
 
 #glyph-options button[aria-pressed="true"] {
-  border-color: #af8ccf;
-  background: #302237;
+  border-color: #bf9bde;
+  background: #392643;
+  color: #f4ddff;
+}
+
+.glyph-option-name {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.glyph-option-assigned {
+  color: #e6cc91;
+  font-size: 10px;
 }
 
 .glyph-preview {
   overflow: auto;
   overscroll-behavior: contain;
-  border: 1px solid #584337;
-  border-radius: 3px;
-  padding: 10px;
-  background: #131114;
 }
 
 .glyph-preview-heading {
   display: flex;
   align-items: center;
   gap: 9px;
+}
+
+.glyph-preview-heading .glyph-emblem {
+  width: 34px;
+  height: 34px;
+  font-size: 12px;
 }
 
 .glyph-preview h3,
@@ -656,12 +683,17 @@ html.workspace-scroll-locked {
 }
 
 .glyph-preview h3 {
-  font: 18px Georgia, serif;
+  font: 21px Georgia, serif;
+  color: #e4c7fa;
 }
 
 .glyph-preview-heading p,
 .glyph-bonus-descriptions p {
-  margin: 2px 0 0;
+  margin: 3px 0 0;
+}
+
+#glyph-progression {
+  margin: 7px 0;
 }
 
 #glyph-progression[data-rarity="rare"] {
@@ -672,26 +704,101 @@ html.workspace-scroll-locked {
   color: #efca85;
 }
 
-p.glyph-legendary-status {
-  color: #d3b78b;
+.glyph-level {
+  min-width: 0;
+  margin: 0;
+  padding: 5px 9px 8px;
+  border: 1px solid #55403a;
 }
 
-.glyph-bonus-descriptions section {
+.glyph-level legend {
+  padding-inline: 5px;
+  color: #ead4af;
+}
+
+.glyph-level-inputs,
+.glyph-level-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.glyph-level-inputs input[type="number"] {
+  width: 66px;
+}
+
+.glyph-level-inputs input[type="range"] {
+  flex: 1;
+  padding: 0;
+  accent-color: #cf9ee8;
+}
+
+.glyph-level-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(30px, 1fr));
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.glyph-level-presets button {
+  padding-inline: 3px;
+}
+
+.glyph-picker input[aria-invalid="true"] {
+  border-color: #f19d86;
+}
+
+.glyph-bonus-descriptions section,
+#glyph-rare-preview {
   margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid #493845;
+  padding: 8px 10px;
+  border: 1px solid #604936;
+  border-left: 2px solid #9a77b1;
+  border-radius: 2px;
+  background: #1d171e;
 }
 
-p.glyph-requirement {
+.glyph-bonus-descriptions .glyph-additional {
+  border-left-color: #9fb184;
+}
+
+.glyph-bonus-descriptions .glyph-legendary {
+  border-left-color: #c59554;
+}
+
+#glyph-rare-preview {
+  border-left-color: #c59554;
+}
+
+.glyph-socket-summary,
+#glyph-rare-preview ul {
+  margin: 4px 0 0;
+  padding-inline-start: 17px;
+}
+
+.glyph-socket-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  gap: 2px 12px;
   color: #d9b2f4;
+  font-size: 12px;
 }
 
+.glyph-socket-summary[hidden] {
+  display: none;
+}
+
+p.glyph-legendary-status {
+  color: #eccb96;
+}
+
+p.glyph-requirement,
 p.glyph-primary-result {
   color: #d9b2f4;
   overflow-wrap: anywhere;
 }
 
-.glyph-preview p.glyph-primary-result:empty {
+.glyph-preview p:empty {
   display: none;
 }
 
@@ -706,20 +813,32 @@ p.glyph-primary-result {
   overflow-wrap: anywhere;
 }
 
-.glyph-level {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.glyph-level input {
-  width: 76px;
-}
-
 .glyph-picker-actions {
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid #614630;
+}
+
+#glyph-draft-status {
+  flex: 1;
+  text-align: right;
+  font-size: 11px;
+}
+
+#glyph-draft-status.is-draft {
+  color: #edd092;
+}
+
+.glyph-picker-actions .glyph-confirm {
+  border-color: #bc9154;
+  background: #51391e;
+  font-weight: 600;
+}
+
+#glyph-remove {
+  border-color: #80534a;
+  color: #f0b7a9;
 }
 
 #glyph-feedback {
@@ -757,7 +876,7 @@ p.glyph-primary-result {
   }
 
   #glyph-options {
-    max-height: 115px;
+    max-height: 120px;
   }
 
   .glyph-preview {
@@ -765,7 +884,18 @@ p.glyph-primary-result {
   }
 
   .glyph-picker-panel {
-    padding: 9px;
+    padding: 8px;
+  }
+
+  .glyph-browser,
+  .glyph-preview {
+    padding: 8px;
+  }
+
+  #glyph-draft-status {
+    flex: 1 0 100%;
+    order: -1;
+    text-align: left;
   }
 }
 
@@ -1628,6 +1758,15 @@ p.glyph-primary-result {
   margin: 0;
   color: #e8c583;
   font: 12px/1.3 Arial, sans-serif;
+}
+
+.socket-card-section {
+  margin-top: 5px;
+  padding-top: 4px;
+}
+
+.socket-card-section p {
+  margin-top: 2px;
 }
 
 .node-card-requirements {

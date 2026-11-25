@@ -910,7 +910,7 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
           'Amplified node tooltip clears the mobile zoom buttons')`);
         await screenshot(`glyph-amplification-${viewport}-${rarity}-node`);
         if (!mobile && rarity === "rare") {
-          await evaluate(`check(q('#node-tooltip h2').textContent === 'Constrict' &&
+          await evaluate(`tip(${node}); check(q('#node-tooltip h2').textContent === 'Constrict' &&
             qa('#node-tooltip .node-card-bonus').map(line => line.textContent).includes('+187.5 Thorns · Effective base'),
             'Amplified Rare base excludes its separate native conditional');
             check(q('#node-tooltip').textContent.includes('Native +150 · Glyph amplification +37.5'), 'Rare shows the native amount and glyph delta');`);
@@ -1102,9 +1102,12 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
           frame.y + frame.height / 2 - stage.y - stage.height / 2];
       };
     `);
+    await paintWorkspace();
     const dragFrom = await evaluate(`{
       const bounds = originalStage.getBoundingClientRect();
-      ({x: bounds.left + 20, y: bounds.top + 200});
+      const point = {x: bounds.left + 20, y: bounds.top + 200};
+      check(document.elementFromPoint(point.x, point.y) === originalStage, 'Drag starts on the visible stage background');
+      point;
     }`);
     const dragTo = { x: dragFrom.x + 30, y: dragFrom.y + 20 };
     await send("Input.dispatchMouseEvent", { type: "mousePressed", button: "left", clickCount: 1, ...dragFrom });
@@ -1226,6 +1229,7 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
       level.value = '25'; level.dispatchEvent(new Event('input', {bubbles:true}));
     `);
     await screenshot("stage-1-desktop-fullscreen-glyph");
+    await screenshot("stage-3-fullscreen");
     await click("q('#glyph-save')");
     await until(() => evaluate("!q('#glyph-picker').open && save().boards[0].glyph?.level === 25"));
     const draft = await evaluate("raw()");
@@ -1267,6 +1271,8 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
     await screenshot("stage-1-mobile-expanded");
     await tap("gate('board00',136)");
     await evaluate("check(q('#glyph-picker').matches(':modal'), 'Touch opens the glyph picker inside fallback')");
+    await evaluate("q('#glyph-preview-heading').scrollIntoView({block:'start', container:'nearest'})");
+    await screenshot("stage-3-mobile-fullscreen");
     await key("Escape", "Escape", 27);
     await until(() => evaluate(`!q('#glyph-picker').open && ${fallbackFullscreen} && document.activeElement === gate('board00',136)`));
     await tap("q('.gate-attachment')");
@@ -1496,6 +1502,191 @@ test("interactive planner in Chrome", { skip: !chromePath && "set CHROME_PATH to
         `);
       }
     }
+  });
+
+  await t.test("glyph management previews the complete build and commits only the confirmed draft", async () => {
+    await send("Page.navigate", { url: base });
+    await ready();
+    await evaluate(`(async () => {
+      const { createStartingLayout, attachBoard, calculateConnectedBonuses, writeConnectedSaveV2 } = await import('./connected-boards.js');
+      const { mergeSharedNodeDefinitions } = await import('./shared-node-definitions.js');
+      const resources = new Map();
+      for (const suffix of ['00', '01']) {
+        const board = await (await fetch('../paladin-board-' + suffix + '.json')).json();
+        const file = suffix === '00' ? 'node-data.json' : 'node-data-' + suffix + '.json';
+        const database = mergeSharedNodeDefinitions(await (await fetch(file)).json());
+        resources.set('board' + suffix, { board, database });
+      }
+      const start = createStartingLayout(resources);
+      const layout = attachBoard(resources, start, new Set([start.root]), 'board00:10', 'board01', 'castle');
+      const queue = [layout.root];
+      const allocated = new Set(queue);
+      for (const id of queue) for (const neighbor of layout.graph.get(id)) if (!allocated.has(neighbor)) {
+        queue.push(neighbor);
+        allocated.add(neighbor);
+      }
+      const zero = { Strength: 0, Intelligence: 0, Willpower: 0, Dexterity: 0 };
+      const native = calculateConnectedBonuses(layout, allocated, zero);
+      const external = { ...zero, Strength: 629 - native.totalAttributes.Strength };
+      const glyphs = new Map([['board00', { snoId: 1029487, level: 1 }], ['castle', { snoId: 2506810, level: 24 }]]);
+      localStorage.setItem(${JSON.stringify(v2)}, JSON.stringify(writeConnectedSaveV2(layout, allocated, glyphs)));
+      localStorage.setItem(${JSON.stringify(externalKey)}, JSON.stringify(external));
+      glyphs.set('castle', { snoId: 2073373, level: 10 });
+      const expected = calculateConnectedBonuses(layout, allocated, external, glyphs);
+      sessionStorage.setItem('expectedGlyphStage3', JSON.stringify(expected.glyphEvaluations.find(record => record.instanceId === 'castle')));
+    })()`);
+    await reload();
+    const socket = "gate('board01',120)";
+    await evaluate(`
+      window.glyphWriteCount = 0;
+      const setItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(key, value) {
+        if (this === localStorage) glyphWriteCount++;
+        return setItem.call(this, key, value);
+      };
+      window.chooseGlyph = id => q('#glyph-options [data-glyph-sno-id="' + id + '"]').click();
+      window.editGlyphLevel = amount => {
+        const level = q('#glyph-level');
+        level.value = amount;
+        level.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      window.searchGlyphs = value => {
+        const input = q('#glyph-search');
+        input.value = value;
+        input.dispatchEvent(new Event('input', {bubbles:true}));
+      };
+      window.glyphView = () => JSON.stringify([raw(), points(), q('#total-strength').textContent,
+        q('#total-stats').textContent, q('#glyph-calculation-list').textContent,
+        q('.glyph-radius-layer').innerHTML, ${socket}.getAttribute('aria-label'),
+        tip(gate('board00',243))]);
+      window.savedGlyphView = glyphView();
+      check(q('#total-strength').textContent === '629' && savedGlyphView.includes('Conditional bonus is inactive.'), 'Brawn starts below the remote threshold');
+      ${socket}.click();
+      const buttons = qa('#glyph-options button');
+      const names = buttons.map(button => button.querySelector('.glyph-option-name').textContent);
+      check(names.length === 21 && names.join() === [...names].sort((a, b) => a.localeCompare(b)).join(), 'All eligible glyphs remain accessible alphabetically');
+      check(q('#glyph-options [aria-pressed="true"]').textContent.includes('SpiritAssigned'), 'Assigned Spirit is marked and selected');
+      check(q('.glyph-primary-result').textContent.includes('purchased Willpower') &&
+        q('.glyph-primary-result').textContent.includes('Critical Strike Damage'), 'Spirit preserves its purchase pool, destination, and conversion');
+      searchGlyphs('no glyph has this name');
+      check(!q('#glyph-no-matches').hidden && !qa('#glyph-options button').length, 'Search explains an empty result');
+      searchGlyphs(' CANNY ');
+      q('#glyph-search').focus();
+    `);
+    await key("ArrowDown", "ArrowDown", 40);
+    await evaluate("check(document.activeElement.dataset.glyphSnoId === '1029487', 'Arrow Down enters filtered results')");
+    await key("Enter", "Enter", 13);
+    await evaluate(`
+      check(q('#glyph-preview-heading h3').textContent === 'Canny' && save().boards[0].glyph.snoId === 1029487,
+        'Canny remains selectable on a second board');
+      check(q('.glyph-primary-result').textContent.includes('22 purchased Intelligence')
+        && q('.glyph-primary-result').textContent.includes('per 5 Intelligence'), 'Canny shows its per-five value and radius pool');
+      check(q('.glyph-additional-progress .is-unmet progress').value === 22
+        && q('.glyph-additional-effects').textContent.startsWith('Unmet'), 'At level 1 the Canny requirement is unmet');
+      check(q('.glyph-legendary-effect').textContent.includes('Locked preview until level 51'), 'The calibrated locked value is a preview');
+      searchGlyphs('');
+    `);
+    await screenshot("stage-3-conversion-unmet");
+    await evaluate(`
+      const slider = q('#glyph-level-slider');
+      check(slider.min === '1' && slider.max === '150' && slider.value === q('#glyph-level').value, 'The editors share the full numeric range');
+      check(qa('[data-glyph-level]').map(button => button.dataset.glyphLevel).join() === '1,25,51,100,150', 'All requested level presets appear');
+      editGlyphLevel(24); check(slider.value === '24' && q('#glyph-progression').textContent.includes('Radius 3'), 'Numeric changes synchronize the slider');
+      slider.value = 25; slider.dispatchEvent(new Event('input', {bubbles:true}));
+      check(q('#glyph-level').value === '25' && q('#glyph-progression').textContent.includes('Radius 4') &&
+        q('.glyph-primary-result').textContent.includes('44 purchased Intelligence'), 'At level 25 the slider adds newly included purchases');
+      editGlyphLevel(50);
+      check(q('.glyph-legendary-effect').textContent.includes('Locked preview'), 'Level 50 remains locked');
+      q('[data-glyph-level="51"]').click();
+      check(slider.value === '51' && q('#glyph-level').value === '51' && q('#glyph-progression').textContent.includes('Radius 5 · Legendary')
+        && q('.glyph-primary-result').textContent.includes('64 purchased Intelligence') &&
+        q('.glyph-legendary-effect').textContent.includes('Would apply on save') &&
+        q('.glyph-legendary-effect').textContent.includes('Non-Physical damage'), 'Level 51 previews the unlocked typed Legendary effect');
+      q('[data-glyph-level="150"]').click();
+      check(q('#glyph-progression').textContent.includes('Maximum level'), 'The level cap is stated');
+      editGlyphLevel(1.5); q('#glyph-save').click();
+      check(q('#glyph-picker').open && q('#glyph-level').getAttribute('aria-invalid') === 'true' && glyphWriteCount === 0, 'Invalid fractional input cannot be saved');
+      chooseGlyph(2506253);
+      check(q('.glyph-primary-result').textContent.includes('Rare node bonuses') &&
+        q('.glyph-socket-summary').textContent.includes('Strength') &&
+        q('.glyph-additional-effects').textContent.includes('Non-Elite or Boss'), 'Outmatch keeps its Rare amplification and target condition');
+      chooseGlyph(2478548);
+      check(q('.glyph-primary-result').textContent.includes('Magic node bonuses') &&
+        q('.glyph-additional-effects').textContent.includes('non-Aura') &&
+        q('.glyph-additional-effects').textContent.includes('Aura skill cast'), 'Resplendence keeps Magic amplification and Aura cooldown scope');
+      chooseGlyph(2506810); q('[data-glyph-level="51"]').click();
+      check(q('.glyph-legendary-effect').textContent.includes('Critical Strike Damage'), 'Spirit retains the Legendary destination');
+    `);
+    await screenshot("stage-3-unlocked-draft");
+    await evaluate(`
+      chooseGlyph(2073373); editGlyphLevel(10);
+      check(q('#glyph-rare-preview').textContent.includes('Starting Board · Brawn · +10% Damage would activate'), 'An isolated Challenger draft previews the remote Rare activation');
+      check(q('.glyph-additional-progress .is-met progress').value === 40 &&
+        q('.glyph-additional-effects').textContent.includes('Would grant on save'), 'The satisfied Additional remains a hypothetical grant');
+      check(qa('.glyph-socket-summary li').length > 1 && q('.glyph-legendary-effect').textContent.includes('Locked preview'),
+        'Amplification shows distinct contributions and a locked Legendary preview');
+      check(glyphWriteCount === 0 && glyphView() === savedGlyphView, 'Opening, filtering, selecting, and editing leave storage, stats, radius, and Rare state identical');
+    `);
+    await screenshot("stage-3-amplification-satisfied");
+    await click("q('#glyph-cancel')");
+    await until(() => evaluate(`!q('#glyph-picker').open && document.activeElement === ${socket}`));
+    await evaluate(`
+      check(glyphView() === savedGlyphView && glyphWriteCount === 0, 'Cancel restores the original assigned level, radius, and totals');
+      ${socket}.click();
+      check(q('#glyph-level').value === '24' && q('#glyph-preview-heading h3').textContent === 'Spirit', 'Reopening restores the assigned selection');
+      chooseGlyph(2073373); editGlyphLevel(10);
+      window.previewPrimary = q('.glyph-primary-result').textContent;
+      window.previewDeltas = q('.glyph-socket-summary').textContent;
+    `);
+    await click("q('#glyph-save')");
+    await until(() => evaluate("!q('#glyph-picker').open"));
+    await evaluate(`
+      const draft = save();
+      check(glyphWriteCount === 1 && draft.boards[1].glyph.snoId === 2073373 && draft.boards[1].glyph.level === 10, 'Confirmation applies the selected level and writes once');
+      check(draft.boards[0].glyph.snoId === 1029487 && tip(gate('board00',243)).includes('Conditional bonus is active.'),
+        'Only the edited socket changes and the previewed Brawn bonus becomes active');
+      const socketTooltip = tip(${socket});
+      check(qa('#node-tooltip .socket-card-section h3').map(title => title.textContent).join() === 'Primary,Additional,Legendary'
+        && socketTooltip.includes('Locked preview until level 51'), 'The live socket tooltip keeps all three effect sections');
+      ${socket}.click();
+      check(q('.glyph-primary-result').textContent === previewPrimary.replace('Unsaved preview', 'Applied Primary')
+        && q('.glyph-socket-summary').textContent === previewDeltas && q('#glyph-rare-preview').hidden,
+        'The saved Primary and each amplification amount match the draft');
+      q('#glyph-save').click();
+      check(glyphWriteCount === 1, 'Confirming the assigned configuration again performs no write');
+    `);
+    await until(() => evaluate(`document.activeElement === ${socket}`));
+    await key("i", "KeyI", 73);
+    await until(() => evaluate("q('#node-details').open"));
+    await evaluate(`
+      const records = JSON.parse(q('#node-details-records').textContent);
+      check(JSON.stringify(records.glyphPrimary[0]) === sessionStorage.getItem('expectedGlyphStage3'),
+        'The committed exact contribution record matches the production calculator for the same configuration');
+      q('#node-details-close').click();
+    `);
+    const committed = await evaluate("raw()");
+    await reload();
+    assert.equal(await evaluate("raw()"), committed);
+    await evaluate(`check(tip(${socket}).includes('Challenger') && tip(gate('board00',243)).includes('Conditional bonus is active.'),
+      'Reload restores glyph, radius calculation, and remote Rare grant')`);
+    await send("Emulation.setDeviceMetricsOverride", { width: 820, height: 380, deviceScaleFactor: 1, mobile: true });
+    await send("Emulation.setTouchEmulationEnabled", { enabled: true });
+    await evaluate("window.scrollTo(0, 0); q('#board-workspace').requestFullscreen = undefined");
+    await tap(fullscreenControl);
+    await until(() => evaluate(fallbackFullscreen));
+    await evaluate(`
+      ${socket}.click();
+      const preview = q('.glyph-preview');
+      check(preview.scrollHeight > preview.clientHeight, 'Short fullscreen gives the effects pane independent scrolling');
+      q('.glyph-legendary-effect').scrollIntoView({block:'end', container:'nearest'});
+      const effect = q('.glyph-legendary-effect').getBoundingClientRect();
+      const pane = preview.getBoundingClientRect();
+      check(effect.top >= pane.top && effect.bottom <= pane.bottom && q('#glyph-save').getBoundingClientRect().bottom <= innerHeight,
+        'Short fullscreen keeps full effect text, confirm and cancel reachable');
+    `);
+    await tap("q('#glyph-cancel')");
+    await until(() => evaluate(`!q('#glyph-picker').open && ${fallbackFullscreen}`));
+    assert.equal(await evaluate("raw()"), committed);
   });
   assert.deepEqual(errors, []);
 });

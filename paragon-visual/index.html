@@ -143,7 +143,7 @@
                   <h2 id="glyph-picker-title">Glyph socket</h2>
                   <button id="glyph-picker-close" type="button" aria-label="Close glyph picker" autofocus>×</button>
                 </header>
-                <p id="glyph-picker-note">Glyph bonuses are eligible when the socket is allocated. Passive combat behavior and modifier stacking remain unresolved.</p>
+                <p id="glyph-picker-note">Glyph bonuses are eligible when the socket is allocated.</p>
                 <div class="glyph-socket-actions">
                   <span id="glyph-socket-state"></span>
                   <button id="glyph-allocate-socket" type="button">Allocate socket</button>
@@ -154,22 +154,56 @@
                     <label for="glyph-search">Search glyphs</label>
                     <input id="glyph-search" type="search" placeholder="Glyph name" autocomplete="off">
                     <ul id="glyph-options" aria-label="Paladin glyphs"></ul>
-                    <p id="glyph-no-matches" hidden>No matching glyphs.</p>
+                    <p id="glyph-no-matches" role="status" hidden>No glyphs match your search. Try a different name.</p>
                   </div>
-                  <div class="glyph-preview">
+                  <div id="glyph-preview" class="glyph-preview">
                     <div id="glyph-preview-heading" class="glyph-preview-heading"></div>
                     <p id="glyph-progression" role="status"></p>
-                    <div id="glyph-bonus-descriptions" class="glyph-bonus-descriptions"></div>
-                    <label class="glyph-level" for="glyph-level">Glyph level
-                      <input id="glyph-level" type="number" inputmode="numeric" required step="1" aria-describedby="glyph-progression glyph-level-note">
-                    </label>
-                    <p id="glyph-level-note"></p>
+                    <fieldset class="glyph-level">
+                      <legend>Glyph level</legend>
+                      <div class="glyph-level-inputs">
+                        <input id="glyph-level" type="number" inputmode="numeric" required step="1" aria-label="Glyph level" aria-describedby="glyph-progression">
+                        <input id="glyph-level-slider" type="range" step="1" aria-label="Glyph level slider">
+                      </div>
+                      <div class="glyph-level-presets" role="group" aria-label="Level presets">
+                        <button type="button" data-glyph-level="1">1</button>
+                        <button type="button" data-glyph-level="25">25</button>
+                        <button type="button" data-glyph-level="51">51</button>
+                        <button type="button" data-glyph-level="100">100</button>
+                        <button type="button" data-glyph-level="150">150</button>
+                      </div>
+                    </fieldset>
+                    <div id="glyph-bonus-descriptions" class="glyph-bonus-descriptions">
+                      <section class="glyph-primary">
+                        <h4>Primary</h4>
+                        <p class="glyph-primary-description"></p>
+                        <p class="glyph-primary-result"></p>
+                        <ul class="glyph-socket-summary"></ul>
+                      </section>
+                      <section class="glyph-additional">
+                        <h4>Additional</h4>
+                        <p class="glyph-requirement"></p>
+                        <ul class="node-card-requirements glyph-additional-progress"></ul>
+                        <p class="glyph-additional-effects"></p>
+                        <p class="glyph-runtime-note">Socket grants and combat conditions are separate. Runtime application and stacking remain unresolved.</p>
+                      </section>
+                      <section class="glyph-legendary">
+                        <h4>Legendary</h4>
+                        <p class="glyph-legendary-status glyph-legendary-effect"></p>
+                      </section>
+                    </div>
+                    <section id="glyph-rare-preview" hidden>
+                      <h4>Rare bonuses affected by this draft</h4>
+                      <ul></ul>
+                    </section>
                   </div>
                 </div>
                 <p id="glyph-feedback" role="status" hidden></p>
                 <footer class="glyph-picker-actions">
                   <button id="glyph-remove" type="button" hidden>Remove glyph</button>
-                  <button id="glyph-save" type="button">Save glyph</button>
+                  <span id="glyph-draft-status" role="status"></span>
+                  <button id="glyph-cancel" type="button">Cancel</button>
+                  <button id="glyph-save" class="glyph-confirm" type="button">Save glyph</button>
                 </footer>
               </div>
             </dialog>

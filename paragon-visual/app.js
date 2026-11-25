@@ -4,9 +4,6 @@ import { BOARD_ROTATIONS, getBoardControlPositions, rotateBoardPoint } from "./b
 import { getPaladinGlyph } from "./paladin-glyph-catalogue.js";
 import { getGlyphProgression } from "./glyph-progression.js";
 import { createGlyphEmblem, createGlyphPicker, describeAdditionalEffects, describeAdditionalRequirement, describeLegendaryEffects, describePrimaryGlyph, formatAmplifiedCore, formatGlyphPrimary } from "./glyph-picker.js";
-import { evaluatePrimaryGlyph } from "./glyph-primary.js";
-import { evaluateAmplificationGlyph } from "./glyph-amplification.js";
-import { evaluateGlyphEffects } from "./glyph-effects.js";
 import { createLegendaryNodePanel, renderLegendaryNodeTooltip } from "./legendary-node-panel.js";
 import {
   attachBoard, calculateConnectedBonuses, CONNECTED_SAVE_KEY, CONNECTED_SAVE_KEY_V2, createStartingLayout, MAX_BOARDS,
@@ -636,20 +633,26 @@ import {
       const { level, radius, rarity } = getGlyphProgression(glyph.level);
       addText(target, "p", "node-card-power", `Level ${level} · Radius ${radius} · ${rarity} glyph`);
       const socketPrimary = primary.find(entry => entry.socketSourceIndex === sourceIndex);
-      const section = addText(target, "section", "node-card-section", "");
       if (socketPrimary) {
-        const label = socketPrimary.status === "unpurchased" ? "Primary preview" : "Primary";
-        addText(section, "p", "", `${label} · ${describePrimaryGlyph(socketPrimary)}`);
+        const section = addText(target, "section", "node-card-section socket-card-section", "");
+        addText(section, "h3", "", socketPrimary.status === "unpurchased" ? "Primary preview" : "Primary");
+        addText(section, "p", "", describePrimaryGlyph(socketPrimary));
         const summary = socketPrimary.deltasByAttribute?.map(line => describeSocketDelta(line)).join(" · ");
         if (summary) addText(section, "p", "node-card-note", summary);
       }
       const { additional, preview, modifiers } = getSocketEffects(currentCalculation, instanceId, sourceIndex);
       if (additional) {
-        addText(section, "p", "", describeAdditionalRequirement(additional));
+        const section = addText(target, "section", "node-card-section socket-card-section", "");
+        addText(section, "h3", "", "Additional");
+        addText(section, "p", "", describeAdditionalRequirement(additional, false));
         addText(section, "p", "node-card-note", describeAdditionalEffects(additional));
       }
-      const legendary = describeLegendaryEffects(preview, modifiers);
-      if (legendary) addText(section, "p", "", legendary);
+      const legendary = describeLegendaryEffects(preview, modifiers, { includeHeading: false });
+      if (legendary) {
+        const section = addText(target, "section", "node-card-section socket-card-section", "");
+        addText(section, "h3", "", "Legendary");
+        addText(section, "p", "", legendary);
+      }
       return;
     }
 
@@ -1293,6 +1296,23 @@ import {
     return allocatedNodeIds.has(id) ? "allocated" : eligible ? "eligible to allocate" : "outside the allocated path";
   }
 
+  function changedRareBonuses(before, after) {
+    const originals = new Map(before.nodeEvaluations.filter(node => node.allocated)
+      .map(node => [node.nodeId ?? node.nodeIndex, node]));
+    const changes = [];
+    for (const node of after.nodeEvaluations) {
+      if (!node.allocated || node.kind !== "rare") continue;
+      const original = originals.get(node.nodeId ?? node.nodeIndex);
+      for (const attribute of node.attributes) {
+        if (attribute.conditionalApplied === original?.attributes[attribute.attributeIndex]?.conditionalApplied) continue;
+        const board = isConnectedMode() ? boardName(node.instanceId) : currentBoardConfig.label.split(" — ")[1];
+        const amount = formatBonusValue(attribute.conditional, attribute.category);
+        changes.push(`${board} · ${node.displayName || "Rare node"} · ${amount} ${playerAttributeLabel(attribute)} ${attribute.conditionalApplied ? "would activate" : "would become inactive"}`);
+      }
+    }
+    return changes;
+  }
+
   function openGlyphPicker(node) {
     const persistent = Boolean(node.instanceId);
     const boardKey = node.boardId ?? currentBoardKey;
@@ -1303,13 +1323,15 @@ import {
       eligible: getEligibleNodeIds().has(node.id),
       persistent,
       evaluateGlyph(configuration, saved) {
-        const board = boardResources.get(boardKey);
-        const input = {
-          board: board.board, instanceId: node.instanceId ?? boardKey, sourceRevision: board.database.source.commit,
-          configuration, nodeEvaluations: currentCalculation.nodeEvaluations
-        };
-        const primary = evaluateAmplificationGlyph(input) ?? evaluatePrimaryGlyph(input);
-        return { primary, ...evaluateGlyphEffects(input, primary, saved) };
+        const result = saved ? currentCalculation : persistent
+          ? calculateBuild(configureConnectedGlyph(connectedLayout, connectedGlyphs, node.instanceId, configuration))
+          : calculateBuild(connectedGlyphs, configuration);
+        const instanceId = node.instanceId ?? boardKey;
+        const sourceIndex = node.sourceIndex ?? node.id;
+        const primary = [...(result.glyphEvaluations ?? []), ...(result.glyphPrimaryPreviews ?? [])]
+          .find(record => record.instanceId === instanceId && record.socketSourceIndex === sourceIndex);
+        return { primary, ...getSocketEffects(result, instanceId, sourceIndex),
+          rareChanges: saved ? [] : changedRareBonuses(currentCalculation, result) };
       },
       describeSocketDelta,
       onAllocate() {
@@ -1940,17 +1962,21 @@ import {
     renderConnections(allocatedConnectionLayer, allocatedNodeIds);
   }
 
-  function updateParagonCalculation() {
-    if (!isConnectedMode() && (!currentBoardDefinition || !currentNodeDatabase)) return;
-    const result = isConnectedMode()
-      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes, connectedGlyphs, legendaryScenario)
+  function calculateBuild(glyphs = connectedGlyphs, inspectorGlyph = inspectorGlyphs.get(currentBoardKey)) {
+    return isConnectedMode()
+      ? calculateConnectedBonuses(connectedLayout, allocatedNodeIds, externalAttributes, glyphs, legendaryScenario)
       : calculateParagonBonuses(
         currentBoardDefinition,
         currentNodeDatabase,
         allocatedNodeIds,
         externalAttributes,
-        { boardEquipIndex: currentBoardConfig.boardEquipIndex, instanceId: currentBoardKey, glyph: inspectorGlyphs.get(currentBoardKey), legendaryScenario }
+        { boardEquipIndex: currentBoardConfig.boardEquipIndex, instanceId: currentBoardKey, glyph: inspectorGlyph, legendaryScenario }
       );
+  }
+
+  function updateParagonCalculation() {
+    if (!isConnectedMode() && (!currentBoardDefinition || !currentNodeDatabase)) return;
+    const result = calculateBuild();
     currentCalculation = result;
     nodeEvaluations = new Map(result.nodeEvaluations.map(node => [node.nodeId ?? node.nodeIndex, node]));
     nodeDetailsButton.disabled = boardNodes.size === 0;
